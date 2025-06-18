@@ -1,17 +1,21 @@
 import express from 'express'
-import RelationController from '../controllers/relationController'
+import RelationController from '../controllers/relationController.js'
+
 const router = express.Router()
 
-router.get('/pending', (req, res) => {
-    RelationController.getPendingRequests()
-})
+router.get('/pending/received/:id', RelationController.getReceivedPendingRequests)
 
-router.get('/friend', (req, res) => {
-    RelationController.getFriends()
-})
+router.get('/pending/sent/:id', RelationController.getSentPendingRequests)
 
-router.get('/blocked', (req, res) => {
-    RelationController.getBlockedUsers()
-})  
+router.get('/friend/:id', RelationController.getFriends)
+
+router.get('/blocked/:id', RelationController.getBlockedUsers)  
+
+router.post('/friend-request/', RelationController.sendFriendRequest)
+
+router.post('/confirm/:docId', RelationController.confirmFriendRequest)
+
+router.delete('/delete-friend', RelationController.deleteFriend)
+
 
 export default router

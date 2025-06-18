@@ -4,15 +4,16 @@ import { collection, addDoc, getDocs, query, where, deleteDoc } from "firebase/f
 
 class UserController{
     async createUser(req, res){
+        const user = {
+            username: req.body.name,
+            email: req.body.email,
+            createdAt: new Date().toISOString()
+        }
+        console.log(user)
         try{
-            const user = {
-                username: 'Benson',
-                email: 'bensonzheng2003@gmail.com',
-                createdAt: new Date().toISOString()
-            }
-            console.log(user)
             UserSchema.parse(user);
-            const docRef = await addDoc(collection(db, 'users'), user)
+            const collectionRef = collect(db, 'users')
+            const docRef = await addDoc(collectionRef, user)
             const data = {
                 id: docRef.id,
                 ...user
@@ -23,15 +24,15 @@ class UserController{
         }
     }
 
-    async retrieveUser(req, res){
-        const q = query(collection(db, 'users'), where('username', '==', 'Benson'))
+    async retrieveUserByEmail(req, res){
+        const queryRef = query(collection(db, 'users'), where('email', '==', req.params.email))
         try{
-            const snapshot = await getDocs(q)
-            if(snapshot.empty){
-                res.status(200).json({status: 'Failed', message: 'User not found'})
+            const querySnapshot = await getDocs(queryRef)
+            if(querySnapshot.empty){
+                res.status(404).json({status: 'Failed', message: 'User not found'})
             }  
             else{ 
-                const data = [snapshot.docs[0]].map(doc => ({
+                const data = [querySnapshot.docs[0]].map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 }))[0]
@@ -42,19 +43,19 @@ class UserController{
         }
     }
 
-    async deleteUser(req, res){
-        const q = query(collection(db, 'users'), where('username', '==', 'Benson'))
+    async deleteUserByEmail(req, res){
+        const queryRef = query(collection(db, 'users'), where('email', '==', req.params.email))
         try{
-            const snapshot = await getDocs(q)
+            const querySnapshot = await getDocs(queryRef)
             if(snapshot.empty){
-                res.status(200).json({status: 'Failed', message: 'User not found'})
+                res.status(404).json({status: 'Failed', message: 'User not found'})
             }
-            const data = [snapshot.docs[0]].map(doc => ({
+            const data = [querySnapshot.docs[0]].map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }))[0]
 
-            await deleteDoc(snapshot.docs[0].ref)
+            await deleteDoc(querySnapshot.docs[0].ref)
             res.status(200).json({status: 'Success', message: 'User deleted', user: data})
         }catch(e){
             res.status(400).json({status: 'Failure', message: `Failed to delete user, error: ${e}`})
