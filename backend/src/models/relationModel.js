@@ -4,7 +4,7 @@ const RelationSchema = z.object({
     from: z.string(),
     to: z.string(),
     status: z.string(),
-    createdAt: z.string().datetime()
+    createdAt: z.any(),
 })
 
 export default RelationSchema

@@ -1,5 +1,5 @@
 import { db } from '../config/firebase.js'
-import { collection, addDoc, getDocs, query, where, deleteDoc, getDoc, doc } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, where, deleteDoc, getDoc, doc, serverTimestamp } from "firebase/firestore"
 import RelationSchema from '../models/relationModel.js'
 
 class RelationController{
@@ -13,7 +13,8 @@ class RelationController{
             const querySnapshot = await getDocs(queryRef)
             const requests = querySnapshot.docs.map(request => ({
                 id: request.id,
-                data: request.data()
+                data: request.data(),
+                createdAt: request.data().createdAt.toDate().toISOString()
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
@@ -30,7 +31,8 @@ class RelationController{
             const querySnapshot = await getDocs(queryRef)
             const requests = querySnapshot.docs.map(request => ({
                 id: request.id,
-                data: request.data()
+                data: request.data(),
+                createdAt: request.data().createdAt.toDate().toISOString()
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
@@ -47,7 +49,8 @@ class RelationController{
             const querySnapshot = await getDocs(queryRef)
             const requests = querySnapshot.docs.map(request => ({
                 id: request.id,
-                data: request.data()
+                data: request.data(),
+                createdAt: request.data().createdAt.toDate().toISOString()
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
@@ -64,7 +67,8 @@ class RelationController{
             const querySnapshot = await getDocs(queryRef)
             const requests = querySnapshot.docs.map(request => ({
                 id: request.id,
-                data: request.data()
+                data: request.data(),
+                createdAt: request.data().createdAt.toDate().toISOString()
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
@@ -78,14 +82,16 @@ class RelationController{
             from,
             to,
             status: 'pending',
-            createdAt: new Date().toISOString()
+            createdAt: serverTimestamp()
         }
         try{
             RelationSchema.parse(request)
             const docRef = await addDoc(collection(db, 'relations'), request)
+            const doc = await getDoc(docRef)
             const data = {
                 id: docRef.id,
-                ...request
+                ...doc.data(),
+                createdAt: doc.data().createdAt.toDate().toISOString()
             }
             res.status(201).json({status: 'Success', message: 'Friend request sent', request: data})
         }catch(e){
@@ -111,13 +117,13 @@ class RelationController{
                         from: data.from,
                         to: data.to,
                         status: 'friend',
-                        createdAt: new Date().toISOString(),
+                        createdAt: serverTimestamp(),
                     }),
                     addDoc(collectionRef, {
                         from: data.to,
                         to: data.from,
                         status: 'friend',
-                        createdAt: new Date().toISOString(),
+                        createdAt: serverTimestamp(),
                     })
                 ])
 
@@ -206,7 +212,7 @@ class RelationController{
                 from,
                 to,
                 status: 'blocked',
-                createdAt: new Date().toISOString()
+                createdAt: serverTimestamp()
             }
             RelationSchema.parse(data)
 

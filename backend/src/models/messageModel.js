@@ -7,8 +7,8 @@ const MessageSchema = z.object({
     fileUrl: z.string().url().optional(),
     fileName: z.string().optional(),
     fileSize: z.number().optional(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime().optional()
+    createdAt: z.any(),
+    updatedAt: z.any().optional()
 });
 
 export default MessageSchema

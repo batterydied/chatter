@@ -1,22 +1,25 @@
 import UserSchema from "../models/userModel.js"
 import { db } from '../config/firebase.js'
-import { collection, addDoc, getDocs, query, where, deleteDoc } from "firebase/firestore"
+import { collection, addDoc, getDocs, getDoc, query, where, deleteDoc, serverTimestamp } from "firebase/firestore"
 
 class UserController{
     async createUser(req, res){
         const user = {
             username: req.body.name,
             email: req.body.email,
-            createdAt: new Date().toISOString()
+            createdAt: serverTimestamp()
         }
-        console.log(user)
         try{
             UserSchema.parse(user);
             const collectionRef = collection(db, 'users')
             const docRef = await addDoc(collectionRef, user)
+
+            const doc = await getDoc(docRef)
+            const createdAt = doc.data().createdAt.toDate().toISOString()
             const data = {
                 id: docRef.id,
-                ...user
+                ...doc.data(),
+                createdAt
             }
             res.status(201).json({status: 'Success', message: 'User created', user: data})
         }catch(e){
@@ -34,7 +37,8 @@ class UserController{
             else{ 
                 const data = [querySnapshot.docs[0]].map(doc => ({
                     id: doc.id,
-                    ...doc.data()
+                    ...doc.data(),
+                    createdAt: doc.data().createdAt.toDate().toISOString()
                 }))[0]
                 res.status(200).json({status: 'Success', user: data})
             }
@@ -53,7 +57,8 @@ class UserController{
             }
             const data = [querySnapshot.docs[0]].map(doc => ({
                 id: doc.id,
-                ...doc.data()
+                ...doc.data(),
+                createdAt: doc.data().createdAt.toDate().toISOString()
             }))[0]
 
             const [toSnapshot, fromSnapshot] = await Promise.all([
