@@ -1,11 +1,12 @@
 import { db } from '../config/firebase.js'
-import { collection, addDoc, getDocs, query, where, deleteDoc, doc, getDoc } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, where, deleteDoc, getDoc, doc } from "firebase/firestore"
 import RelationSchema from '../models/relationModel.js'
 
 class RelationController{
     async getSentPendingRequests(req, res){
+        const { id } = req.params
         const queryRef = query(collection(db, 'relations'), 
-            where('from', '==', req.params.id), 
+            where('from', '==', id), 
             where('status', '==', 'pending')
         )
         try{
@@ -21,8 +22,9 @@ class RelationController{
     }
 
     async getReceivedPendingRequests(req, res){
+        const { id } = req.params
         const queryRef = query(collection(db, 'relation'), 
-        where('to', '==', req.params.id),
+        where('to', '==', id),
         where('status', '==', 'pending'))
         try{
             const querySnapshot = await getDocs(queryRef)
@@ -37,8 +39,9 @@ class RelationController{
     }
 
     async getBlockedUsers(req, res){
+        const { id } = req.params
         const queryRef = query(collection(db, 'relation'), 
-        where('to', '==', req.params.id),
+        where('to', '==', id),
         where('status', '==', 'blocked'))
         try{
             const querySnapshot = await getDocs(queryRef)
@@ -53,8 +56,9 @@ class RelationController{
     }
 
     async getFriends(req, res){
+        const { id } = req.params
         const queryRef = query(collection(db, 'relation'), 
-        where('to', '==', req.params.id),
+        where('to', '==', id),
         where('status', '==', 'friend'))
         try{
             const querySnapshot = await getDocs(queryRef)
@@ -69,8 +73,7 @@ class RelationController{
     }
 
     async sendFriendRequest(req, res){
-        const from = req.body.from
-        const to = req.body.to
+        const { from, to } = req.body
         const request = {
             from,
             to,
@@ -91,7 +94,7 @@ class RelationController{
     }
 
     async confirmFriendRequest(req, res){
-        const docId = req.params.docId
+        const { docId } = req.params
         const docRef = doc(db, 'relations', docId)
         try{
             const docSnapshot = await getDoc(docRef)
@@ -130,7 +133,7 @@ class RelationController{
     }
 
     async denyFriendRequest(req, res){
-        const docId = req.params.docId
+        const { docId } = req.params
         const docRef = doc(db, 'relations', docId)
         try{
             const docSnapshot = await getDoc(docRef)
@@ -148,16 +151,16 @@ class RelationController{
     }
 
     async deleteFriend(req, res){
-        const body = req.body
+        const { from, to } = req.body
         const collectionRef = collection(db, 'relations')
         const queryRef1 = query(collectionRef, 
-            where('from', '==', body.from), 
-            where('to', '==', body.to),
+            where('from', '==', from), 
+            where('to', '==', to),
             where('status', '==', 'friend')
         )
         const queryRef2 = query(collectionRef, 
-            where('from', '==', body.to), 
-            where('to', '==', body.from),
+            where('from', '==', to), 
+            where('to', '==', from),
             where('status', '==', 'friend')
         )
         try{
@@ -176,6 +179,60 @@ class RelationController{
             }
         }catch(e){
             res.status(400).json({status: 'Failure', message: `Failed to delete friend, error: ${e}`})
+        }
+    }
+
+    async blockUser(req, res){
+        const { from, to } = req.body
+        const collectionRef = collection(db, 'relations')
+        const queryRef = query(collectionRef, 
+            where('from', '==', from), 
+            where('to', '==', to),
+        )
+        const reverseQuery = query(collectionRef, 
+            where('from', '==', to), 
+            where('to', '==', from)
+        );
+        try{
+            const snapshot = await getDocs(queryRef)
+            if(!snapshot.empty){
+                await Promise.all(snapshot.docs.map((doc)=>deleteDoc(doc.ref)))
+            }
+            const reverseSnapshot = await getDocs(reverseQuery);
+            if(!reverseSnapshot.empty){
+                await Promise.all(reverseSnapshot.docs.map((doc)=>deleteDoc(doc.ref)))
+            }
+            const data = {
+                from,
+                to,
+                status: 'blocked',
+                createdAt: new Date().toISOString()
+            }
+            RelationSchema.parse(data)
+
+            await addDoc(collectionRef, data)
+            res.status(200).json({status: 'Success', message: 'User blocked successfully'})
+        }catch(e){
+            res.status(400).json({status: 'Failure', message: `Failed to block user, error: ${e}`})
+        }
+    }
+
+    async unblockUser(req, res){
+        const { from, to } = req.body
+        const collectionRef = collection(db, 'relations')
+        const queryRef = query(collectionRef, 
+            where('from', '==', from),
+            where('to', '==', to),
+            where('status', '==', 'blocked')
+        )
+        try{
+            const snapshot = await getDocs(queryRef)
+            if(!snapshot.empty){
+                await Promise.all(snapshot.docs.map((doc)=>deleteDoc(doc.ref)))
+            }
+            res.status(200).json({status: 'Success', message: `Successfully unblocked user ${to}`})
+        }catch(e){
+            res.status(400).json({status: 'Failure', message: `Failed to unblock user ${to}, error: ${e}`})
         }
     }
 }

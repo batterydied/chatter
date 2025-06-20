@@ -12,7 +12,7 @@ class UserController{
         console.log(user)
         try{
             UserSchema.parse(user);
-            const collectionRef = collect(db, 'users')
+            const collectionRef = collection(db, 'users')
             const docRef = await addDoc(collectionRef, user)
             const data = {
                 id: docRef.id,
@@ -47,13 +47,23 @@ class UserController{
         const queryRef = query(collection(db, 'users'), where('email', '==', req.params.email))
         try{
             const querySnapshot = await getDocs(queryRef)
-            if(snapshot.empty){
+            if(querySnapshot.empty){
                 res.status(404).json({status: 'Failed', message: 'User not found'})
+                return
             }
             const data = [querySnapshot.docs[0]].map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }))[0]
+
+            const [toSnapshot, fromSnapshot] = await Promise.all([
+                getDocs(query(collection(db, 'relations'), where('to', '==', data.id))),
+                getDocs(query(collection(db, 'relations'), where('from', '==', data.id)))
+            ]);
+
+            const relationshipDocs = [...toSnapshot.docs, ...fromSnapshot.docs]
+
+            await Promise.all(relationshipDocs.map((doc) => deleteDoc(doc.ref)))
 
             await deleteDoc(querySnapshot.docs[0].ref)
             res.status(200).json({status: 'Success', message: 'User deleted', user: data})

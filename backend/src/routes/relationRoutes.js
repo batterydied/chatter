@@ -17,5 +17,7 @@ router.post('/confirm/:docId', RelationController.confirmFriendRequest)
 
 router.delete('/delete-friend', RelationController.deleteFriend)
 
+router.post('/block', RelationController.blockUser)
 
+router.post('/unblock', RelationController.unblockUser)
 export default router
