@@ -18,7 +18,7 @@ class RelationController{
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
-            res.status(400).json({status: "Failure", message: `Failed to get pending requests from user id: ${id}, error message: ${e}`})
+            res.status(500).json({status: "Failure", message: `Failed to get pending requests from user id: ${id}, error message: ${e}`})
         }
     }
 
@@ -36,7 +36,7 @@ class RelationController{
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
-            res.status(400).json({status: "Failure", message: `Failed to get pending requests to user id: ${id}, error message: ${e}`})
+            res.status(500).json({status: "Failure", message: `Failed to get pending requests to user id: ${id}, error message: ${e}`})
         }
     }
 
@@ -54,7 +54,7 @@ class RelationController{
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
-            res.status(400).json({status: "Failure", message: `Failed to get blocked users, error message: ${e}`})
+            res.status(500).json({status: "Failure", message: `Failed to get blocked users, error message: ${e}`})
         }
     }
 
@@ -72,7 +72,7 @@ class RelationController{
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
-            json.status(400).json({status: "Failure", message: `Failed to get friended users, error message: ${e}`})
+            json.status(500).json({status: "Failure", message: `Failed to get friended users, error message: ${e}`})
         }
     }
 
@@ -89,13 +89,13 @@ class RelationController{
             const docRef = await addDoc(collection(db, 'relations'), request)
             const doc = await getDoc(docRef)
             const data = {
-                id: docRef.id,
+                id: doc.id,
                 ...doc.data(),
                 createdAt: doc.data().createdAt.toDate().toISOString()
             }
             res.status(201).json({status: 'Success', message: 'Friend request sent', request: data})
         }catch(e){
-            res.status(400).json({status: 'Failure', message: `Failed to send friend request to user: ${to}, error message: ${e}`})
+            res.status(500).json({status: 'Failure', message: `Failed to send friend request to user: ${to}, error message: ${e}`})
         }
     }
 
@@ -134,7 +134,7 @@ class RelationController{
                 }})
             }
         }catch(e){
-            res.status(400).json({status: 'Failure', message: `Failed to confirm friend request, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: `Failed to confirm friend request, error: ${e}`})
         }
     }
 
@@ -152,7 +152,7 @@ class RelationController{
             }
         }
         catch(e){
-            res.status(400).json({status: 'Failure', message: `Failed to deny friend request, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: `Failed to deny friend request, error: ${e}`})
         }
     }
 
@@ -184,7 +184,7 @@ class RelationController{
                 res.status(200).json({status: 'Success', message: 'Friends deleted'})
             }
         }catch(e){
-            res.status(400).json({status: 'Failure', message: `Failed to delete friend, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: `Failed to delete friend, error: ${e}`})
         }
     }
 
@@ -219,7 +219,7 @@ class RelationController{
             await addDoc(collectionRef, data)
             res.status(200).json({status: 'Success', message: 'User blocked successfully'})
         }catch(e){
-            res.status(400).json({status: 'Failure', message: `Failed to block user, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: `Failed to block user, error: ${e}`})
         }
     }
 
@@ -238,7 +238,7 @@ class RelationController{
             }
             res.status(200).json({status: 'Success', message: `Successfully unblocked user ${to}`})
         }catch(e){
-            res.status(400).json({status: 'Failure', message: `Failed to unblock user ${to}, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: `Failed to unblock user ${to}, error: ${e}`})
         }
     }
 }

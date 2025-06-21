@@ -2,7 +2,7 @@ import 'dotenv/config'
 import express from "express"
 import UserRoutes from "./routes/userRoutes.js"
 import RelationRoutes from "./routes/relationRoutes.js"
-//import ConversationRoutes from "./routes/conversationRoutes.js"
+import ConversationRoutes from "./routes/conversationRoutes.js"
 
 const app = express()
 const PORT = 5001
@@ -12,7 +12,7 @@ app.use(express.json())
 
 app.use('/api/user', UserRoutes)
 app.use('/api/relation', RelationRoutes)
-//app.use('/api/conversation', ConversationRoutes)
+app.use('/api/conversation', ConversationRoutes)
 
 app.get('/', (req, res) => {
     res.send({message: 'You have reached the server.'})
