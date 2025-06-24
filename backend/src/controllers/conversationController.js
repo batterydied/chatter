@@ -57,7 +57,17 @@ class ConversationController{
             orderBy('lastMessageTime', 'desc')
         )
         try{
-            //comeback here
+            const conversationSnapshot = await getDocs(queryRef)
+      
+            res.status(200).json({
+                status: 'Success', 
+                conversations: conversationSnapshot.docs.map((doc)=>
+                    ({
+                        id: doc.id,
+                        ...doc.data()
+                    }))
+            })
+
         }catch(e){
             res.status(500).json({status: 'Failure', message: 'Failed to get conversations', error: e instanceof Error ? e.message : e})
         }
