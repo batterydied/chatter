@@ -3,10 +3,14 @@ import express from "express"
 import UserRoutes from "./routes/userRoutes.js"
 import RelationRoutes from "./routes/relationRoutes.js"
 import ConversationRoutes from "./routes/conversationRoutes.js"
+import cors from 'cors'
 
 const app = express()
 const PORT = 5001
 
+app.use(cors({
+  origin: 'http://localhost:5173',
+}))
 app.use(express.urlencoded({extended: true}))
 app.use(express.json())
 
