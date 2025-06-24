@@ -25,7 +25,7 @@ class ConversationController{
                 }
             })
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to create conversation, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to create conversation', error: e instanceof Error ? e.message : e})
         }
     }
 
@@ -45,7 +45,7 @@ class ConversationController{
                 }
             })
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to get conversation, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to get conversation', error: e instanceof Error ? e.message : e})
         }
     }
 
@@ -59,7 +59,7 @@ class ConversationController{
         try{
             //comeback here
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to get conversations, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to get conversations', error: e instanceof Error ? e.message : e})
         }
     }
 
@@ -70,7 +70,7 @@ class ConversationController{
         try{
             const conversationSnapshot = await getDoc(conversationRef)
             if(!conversationSnapshot.exists()){
-                return res.status(404).json({status: 'Failure', message: 'Conversation not found'})
+                return res.status(404).json({status: 'Failure', message: 'Conversation not found', error: e instanceof Error ? e.message : e})
             }
             const data = conversationSnapshot.data()
             const updatedFields = {
@@ -86,7 +86,7 @@ class ConversationController{
             res.status(200).json({status: 'Success', updatedFields})
 
         }catch(e){
-            res.status(500).json({status: 'Failure', message: 'Failed to update conversation'})
+            res.status(500).json({status: 'Failure', message: 'Failed to update conversation', error: e instanceof Error ? e.message : e})
         }
 
     }
@@ -100,7 +100,7 @@ class ConversationController{
             await deleteDoc(docRef)
             res.status(200).json({status: 'Success', message: 'Conversation deleted successfully'})
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to delete conversation, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to delete conversation', error: e instanceof Error ? e.message : e})
         }
     }
 }

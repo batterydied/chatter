@@ -23,7 +23,7 @@ class UserController{
             }
             res.status(201).json({status: 'Success', message: 'User created', user: data})
         }catch(e){
-            res.status(500).json({status: 'Failed', message: `Failed to create user, error: ${e}`})
+            res.status(500).json({status: 'Failed', message: 'Failed to create user', error: e instanceof Error ? e.message : e})
         }
     }
 
@@ -43,7 +43,7 @@ class UserController{
                 res.status(200).json({status: 'Success', user: data})
             }
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to retrieve user, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to retrieve user', error: e instanceof Error ? e.message : e})
         }
     }
 
@@ -73,7 +73,7 @@ class UserController{
             await deleteDoc(querySnapshot.docs[0].ref)
             res.status(200).json({status: 'Success', message: 'User deleted', user: data})
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to delete user, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to delete user', error: e instanceof Error ? e.message : e})
         }
     }
 }

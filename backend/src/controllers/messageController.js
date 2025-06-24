@@ -18,7 +18,7 @@ class MessageController{
                 })
             )})
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to get messages, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to get messages', error: e instanceof Error ? e.message : e})
         }
     }
 
@@ -39,7 +39,7 @@ class MessageController{
                 }
             })
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to get message, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to get message', error: e instanceof Error ? e.message : e})
         }
     }
 
@@ -47,7 +47,9 @@ class MessageController{
         const { conversationId } = req.params
 
         const { senderId, type, text, fileUrl, fileName, fileSize } = req.body
-        const collectionRef = collection(db, 'conversations', conversationId, 'messages')
+        const conversationRef = doc(db, 'conversations', conversationId)
+        const messageCollectionRef = collection(db, 'conversations', conversationId, 'messages')
+
         try{
             const rawMessage = {
                 senderId,
@@ -63,8 +65,13 @@ class MessageController{
 
             const message = Object.fromEntries(Object.entries(rawMessage).filter(([_, val]) => val !== undefined))
 
-            const data = await addDoc(collectionRef, message)
+            const data = await addDoc(messageCollectionRef, message)
             const messageDoc = await getDoc(data)
+
+            const updatedMessageTime = {
+                lastMessageTime: serverTimestamp()
+            }
+            await updateDoc(conversationRef, updatedMessageTime)
 
             res.status(201).json({status: 'Success', data: 
                 {
@@ -74,7 +81,7 @@ class MessageController{
                 }
             })
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to create message, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to create message', error: e instanceof Error ? e.message : e})
         }
     }
 
@@ -98,7 +105,7 @@ class MessageController{
 
             res.status(200).json({status: 'Success', updatedText: text})
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to edit message, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to edit message', error: e instanceof Error ? e.message : e})
         }
     }
 
@@ -110,7 +117,7 @@ class MessageController{
             await deleteDoc(docRef)
             res.status(200).json({status: 'Success'})
         }catch(e){
-            res.status(500).json({status: 'Failure', message: `Failed to delete message, error: ${e}`})
+            res.status(500).json({status: 'Failure', message: 'Failed to delete message', error: e instanceof Error ? e.message : e})
         }
     }
 
