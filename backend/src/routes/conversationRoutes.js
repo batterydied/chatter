@@ -4,7 +4,7 @@ import MessageRoutes from '../routes/messageRoutes.js'
 
 const router = express.Router()
 
-router.use('/:conversationId/messages', MessageRoutes)
+router.use('/:conversationId/message', MessageRoutes)
 
 router.get('/user/:userId', ConversationController.getAllConversationsByUserId)
 router.get('/:conversationId', ConversationController.getConversationById)

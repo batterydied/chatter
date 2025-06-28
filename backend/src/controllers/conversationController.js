@@ -1,5 +1,5 @@
 import { db } from '../config/firebase.js'
-import { collection, addDoc, getDocs, query, where, deleteDoc, getDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, where, deleteDoc, getDoc, doc, serverTimestamp, updateDoc, orderBy } from "firebase/firestore"
 import ConversationSchema from "../models/conversationModel.js"
 import { deleteAllMessagesHelper } from './messageController.js'
 

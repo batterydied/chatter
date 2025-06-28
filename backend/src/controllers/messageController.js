@@ -1,5 +1,5 @@
 import { db } from '../config/firebase.js'
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, getDoc, doc, serverTimestamp } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, getDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore"
 import MessageSchema from '../models/messageModel.js'
 
 class MessageController{

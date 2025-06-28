@@ -2,6 +2,7 @@ import type { User } from 'firebase/auth'
 import { Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { fetchUserFromDB } from './homePageHelpers'
+import type { AppUser } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 
 type HomeProps = {
@@ -12,11 +13,12 @@ type HomeProps = {
 
 const HomePage = ({user, logOut} : HomeProps) => {
     const [isNewUser, setIsNewUser] = useState<boolean | null>(null)
+    const [appUser, setAppUser] = useState<AppUser | null>(null)
 
     useEffect(()=>{
         if(user && user.email){
             const checkUser = async (email: string) => {
-                await fetchUserFromDB(email, setIsNewUser)
+                await fetchUserFromDB(email, setIsNewUser, setAppUser)
             }
             checkUser(user.email)
         }
@@ -39,7 +41,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                     <div className='flex flex-row w-full h-full'>
                         <div className='w-1/4'>
                             <div className='list h-5/6 overflow-y-auto'>
-                                <p className='list-row'> hi</p>
+                                <p className='list-row'> bi</p>
                                 <p className='list-row'> hi</p>
                                 <p className='list-row'> hi</p>
                                 <p className='list-row'> hi</p>
@@ -56,7 +58,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <p className='list-row'> hi</p>
                             </div>
                             <div className='flex h-1/6 justify-between items-center'>
-                                <p>placeholder</p>
+                                <p>{appUser?.username}</p>
                                 <button className='btn btn-neutral' onClick={logOut}>Log out</button>
                             </div>
                         </div>

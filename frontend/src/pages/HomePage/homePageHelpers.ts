@@ -1,14 +1,25 @@
 import axios from 'axios'
 
-export const fetchUserFromDB = async (email: string, setter: (isNewUser: boolean)=>void) => {
+export type AppUser = {
+    id: string,
+    createdAt: string,
+    username: string,
+    email: string
+}
+
+export const fetchUserFromDB = async (
+    email: string, 
+    newUserSetter: (isNewUser: boolean)=>void, 
+    appUserSetter: (appUser: AppUser)=>void
+) => {
     try{
         const res = await axios.get(import.meta.env.VITE_BACKEND_API_URL + `user/${email}`)
         const data = res.data
-        console.log(data.user)
-        setter(false)
+        appUserSetter(data.user)
+        newUserSetter(false)
     }catch(e){
         if (axios.isAxiosError(e) && e.response?.status === 404) {
-            setter(true);
+            newUserSetter(true);
         }else{
             console.log('Unknown error occurred')
         }
@@ -30,5 +41,8 @@ export const createUser = async (email: string, username: string) => {
             console.log('Unknown error occurred')
         }
     }
+}
 
+export const getConversationByRecency = async (userId: string)=>{
+    await axios.get(import.meta.env.VITE_BACKEND_API_URL)
 }
