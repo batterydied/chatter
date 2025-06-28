@@ -1,10 +1,17 @@
 import axios from 'axios'
+import { db } from '../../config/firebase'
+import { collection, where, query, onSnapshot } from 'firebase/firestore'
 
 export type AppUser = {
     id: string,
     createdAt: string,
     username: string,
     email: string
+}
+
+export type Conversation = {
+    id: string,
+    name: string
 }
 
 export const fetchUserFromDB = async (
@@ -43,6 +50,20 @@ export const createUser = async (email: string, username: string) => {
     }
 }
 
-export const getConversationByRecency = async (userId: string)=>{
-    await axios.get(import.meta.env.VITE_BACKEND_API_URL)
+export const subscribeConversation = (userId: string, setter: (conversations: Conversation[])=>void) => {
+    const queryRef = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', userId)
+    );
+    const unsub = onSnapshot(queryRef, (snapshot)=>{
+        const conversations: Conversation[] = snapshot.docs.map((doc)=>(
+            {
+                id: doc.id,
+                name: doc.data().name
+            }
+        ))
+        setter(conversations)
+    })
+
+    return unsub
 }

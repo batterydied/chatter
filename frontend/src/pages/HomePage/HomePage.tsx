@@ -1,8 +1,8 @@
 import type { User } from 'firebase/auth'
 import { Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { fetchUserFromDB } from './homePageHelpers'
-import type { AppUser } from './homePageHelpers'
+import { fetchUserFromDB, subscribeConversation } from './homePageHelpers'
+import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 
 type HomeProps = {
@@ -14,6 +14,7 @@ type HomeProps = {
 const HomePage = ({user, logOut} : HomeProps) => {
     const [isNewUser, setIsNewUser] = useState<boolean | null>(null)
     const [appUser, setAppUser] = useState<AppUser | null>(null)
+    const [recentConversations, setRecentConversations] = useState<Conversation[]>([])
 
     useEffect(()=>{
         if(user && user.email){
@@ -23,6 +24,11 @@ const HomePage = ({user, logOut} : HomeProps) => {
             checkUser(user.email)
         }
     }, [user])
+
+    useEffect(()=>{
+        const unsub = subscribeConversation(setRecentConversations)
+        return unsub
+    }, [appUser])
 
     if(isNewUser === null){
         return (

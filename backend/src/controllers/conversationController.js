@@ -7,15 +7,21 @@ class ConversationController{
     async createConversation(req, res){
         const collectionRef = collection(db, 'conversations')
 
-        const { participants } = req.body
+        const { participants, name } = req.body
         const conversation = {
+            name,
             participants,
             createdAt: serverTimestamp()
         }
 
         try{
             ConversationSchema.parse(conversation)
-            const docRef = await addDoc(collectionRef, conversation)
+            const createdField = {
+                name: conversation.name ?? '',
+                participants: conversation.participants,
+                createdAt: conversation.createdAt
+            }
+            const docRef = await addDoc(collectionRef, createdField)
             const docSnapshot = await getDoc(docRef)
             res.status(201).json({status: 'Success', data:
                 {
@@ -75,7 +81,7 @@ class ConversationController{
 
     async updateConversationById(req, res){
         const { conversationId } = req.params
-        const { participants, hiddenBy, mutedBy, lastMessageTime } = req.body
+        const { participants, hiddenBy, mutedBy, lastMessageTime, name } = req.body
         const conversationRef = doc(db, 'conversations', conversationId)
         try{
             const conversationSnapshot = await getDoc(conversationRef)
@@ -87,7 +93,8 @@ class ConversationController{
                 participants: participants ?? data.participants,
                 hiddenBy: hiddenBy ?? data.hiddenBy,
                 mutedBy: mutedBy ?? data.mutedBy,
-                lastMessageTime: lastMessageTime ?? data.lastMessageTime
+                lastMessageTime: lastMessageTime ?? data.lastMessageTime,
+                name: name ?? data.name
             }
 
             ConversationSchema.parse(updatedFields)

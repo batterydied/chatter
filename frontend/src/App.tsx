@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import AuthPage from './pages/AuthPage/AuthPage';
 import HomePage from './pages/HomePage/HomePage';
 import { useState, useEffect } from 'react'
-import auth from './config/firebase'
+import { auth } from './config/firebase'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import type { User } from 'firebase/auth'
 
@@ -29,7 +29,7 @@ function App() {
 
   useEffect(()=>{
       const unsubscribe = onAuthStateChanged(auth, (user) => {
-          if (user) {
+          if(user){
               setUser(user)
           } else {
               console.log('Not signed in')
