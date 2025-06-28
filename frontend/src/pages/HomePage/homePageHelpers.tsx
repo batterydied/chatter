@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { db } from '../../config/firebase'
-import { collection, where, query, onSnapshot } from 'firebase/firestore'
+import { collection, where, query, onSnapshot, doc, getDoc, orderBy } from 'firebase/firestore'
 
 export type AppUser = {
     id: string,
@@ -53,17 +53,46 @@ export const createUser = async (email: string, username: string) => {
 export const subscribeConversation = (userId: string, setter: (conversations: Conversation[])=>void) => {
     const queryRef = query(
       collection(db, 'conversations'),
-      where('participants', 'array-contains', userId)
+      where('participants', 'array-contains', userId),
+      orderBy('lastMessageTime', 'desc')
     );
-    const unsub = onSnapshot(queryRef, (snapshot)=>{
-        const conversations: Conversation[] = snapshot.docs.map((doc)=>(
+    const unsub = onSnapshot(queryRef, async (snapshot)=>{
+        const conversations: Conversation[] = await Promise.all(snapshot.docs.map(async (doc)=>(
             {
                 id: doc.id,
-                name: doc.data().name
+                name: await serializedName(doc.data().name, doc.data().participants, userId)
             }
-        ))
+        )))
         setter(conversations)
     })
 
     return unsub
 }
+
+const serializedName = async (name: string, participants: string[], userId: string) => {
+    const MAX_LENGTH = 15
+    if(name == ""){
+        const filteredIds = participants.filter((participant) => participant != userId)
+        const usernames = await Promise.all(
+            filteredIds.map(async (id) => {
+                const docRef = doc(db, 'users', id);
+                const docSnapshot = await getDoc(docRef);
+                return docSnapshot.exists() ? docSnapshot.data().username : 'Unknown User';
+            })
+        );
+        const filteredName = usernames.join(', ')
+        return filteredName.length <= MAX_LENGTH ? filteredName : filteredName.slice(0, MAX_LENGTH - 1) + '…';
+    }else{
+        return name
+    }
+}
+
+export const renderConversations = (conversations: Conversation[]) => {
+  return conversations.map((c) => (
+    <div key={c.id}>
+        <p>{c.name}</p>
+    </div>
+  ));
+};
+
+

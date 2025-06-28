@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth'
 import { Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { fetchUserFromDB, subscribeConversation } from './homePageHelpers'
+import { fetchUserFromDB, subscribeConversation, renderConversations } from './homePageHelpers'
 import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 
@@ -26,8 +26,10 @@ const HomePage = ({user, logOut} : HomeProps) => {
     }, [user])
 
     useEffect(()=>{
-        const unsub = subscribeConversation(setRecentConversations)
-        return unsub
+        if(appUser){
+            const unsub = subscribeConversation(appUser.id, setRecentConversations)
+            return unsub
+        }
     }, [appUser])
 
     if(isNewUser === null){
@@ -47,21 +49,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                     <div className='flex flex-row w-full h-full'>
                         <div className='w-1/4'>
                             <div className='list h-5/6 overflow-y-auto'>
-                                <p className='list-row'> bi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
-                                <p className='list-row'> hi</p>
+                                {renderConversations(recentConversations)}
                             </div>
                             <div className='flex h-1/6 justify-between items-center'>
                                 <p>{appUser?.username}</p>
