@@ -14,6 +14,12 @@ export type Conversation = {
     name: string,
 }
 
+export type Friend = {
+    status: string
+    userId: string
+    username: string
+}
+
 export const fetchUserFromDB = async (
     email: string, 
     newUserSetter: (isNewUser: boolean)=>void, 
@@ -96,10 +102,40 @@ const serializedName = async (name: string, participants: string[], userId: stri
 
 export const renderConversations = (conversations: Conversation[]) => {
   return conversations.map((c) => (
-    <div key={c.id}>
+    <li className='list-row no-list-divider' key={c.id}>
         <p>{c.name}</p>
-    </div>
+    </li>
+  ));
+};
+
+export const renderFriends = (friends: Friend[]) => {
+  return friends.map((f) => (
+    <li className='list-row' key={f.userId}>
+        <p>{f.username}</p>
+    </li>
   ));
 };
 
 
+export const mockFriendData: Friend[] = [
+    {
+        userId: '1',
+        status: 'online',
+        username: 'Ben'
+    
+    },
+    {
+        userId: '2',
+        status: 'online',
+        username: 'Len'
+    
+    },
+    {
+        userId: '3',
+        status: 'online',
+        username: 'Cen'
+    
+    }
+
+
+]

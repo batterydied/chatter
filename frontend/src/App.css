@@ -10,7 +10,7 @@
   scrollbar-width: none;
 }
 
-.list-row::after{
+.no-list-divider::after {
   content: none;
 }
 
@@ -19,5 +19,5 @@
 }
 
 button:hover{
-  border-color: var(--color-primary);
+  border-color: var(--color-accent);
 }

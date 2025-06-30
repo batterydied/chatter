@@ -1,9 +1,10 @@
 import type { User } from 'firebase/auth'
 import { Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { fetchUserFromDB, subscribeConversation, renderConversations } from './homePageHelpers'
+import { fetchUserFromDB, subscribeConversation, renderConversations, mockFriendData } from './homePageHelpers'
 import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
+import FriendList from './components/FriendList'
 
 type HomeProps = {
     user: User | null
@@ -16,6 +17,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [appUser, setAppUser] = useState<AppUser | null>(null)
     const [recentConversations, setRecentConversations] = useState<Conversation[]>([])
     const [loading, setLoading] = useState(true)
+    const [openConversation, setOpenConversation] = useState(false)
 
     useEffect(()=>{
         if(user && user.email){
@@ -48,17 +50,31 @@ const HomePage = ({user, logOut} : HomeProps) => {
                     <NewUserModal setIsNewUser={setIsNewUser} email={user.email} setAppUser={setAppUser}/>
                 ) : (
                     <div className='flex flex-row w-full h-full'>
-                        <div className='w-1/4'>
-                            <div className='list h-5/6 overflow-y-auto'>
+                        <div className='w-[340px]'>
+                            <ul className='list h-5/6 overflow-y-auto'>
                                 {renderConversations(recentConversations)}
-                            </div>
-                            <div className='flex h-1/6 justify-between items-center'>
-                                <p>{appUser?.username}</p>
+                            </ul>
+                            <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
+                                <div className='flex flex-row items-center'>
+                                    <div className="avatar avatar-online avatar-placeholder">
+                                        <div className="bg-neutral text-base-content w-16 rounded-full">
+                                            <span className="text-xl">{appUser?.username.slice(0, 2)}</span>
+                                        </div>
+                                    </div>
+                                    <div className='pl-2'>
+                                        <p className='text-sm'>{appUser?.username}</p>
+                                        <p className='text-neutral-content'>status</p>
+                                    </div>
+                                </div>
                                 <button className='btn btn-neutral' onClick={logOut}>Log out</button>
                             </div>
                         </div>
-                        <div className='w-3/4'>
-                            <p>placeholder</p>
+                        <div className='px-12'>
+                            <button className='btn'>close friend list</button>
+                            {openConversation ? 
+                            <p>Opened</p>
+                            : 
+                            <FriendList friends={mockFriendData}/>}
                         </div>
                     </div>
                 )
