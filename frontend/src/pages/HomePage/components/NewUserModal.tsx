@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { createUser } from '../homePageHelpers'
+import { createUser, type AppUser } from '../homePageHelpers'
 type NewUserModalProps = {
     setIsNewUser: (state: boolean) => void,
+    setAppUser: (appUser: AppUser) => void
     email: string
 
 }
-const NewUserModal = ({setIsNewUser, email}: NewUserModalProps) => {
+const NewUserModal = ({setIsNewUser, email, setAppUser}: NewUserModalProps) => {
     const [username, setUsername] = useState<string>('')
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -13,7 +14,7 @@ const NewUserModal = ({setIsNewUser, email}: NewUserModalProps) => {
     }
 
     const handleSubmit = async () => {
-        await createUser(email, username)
+        await createUser(email, username, setAppUser)
         setIsNewUser(false)
     }
 

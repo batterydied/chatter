@@ -15,11 +15,12 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [isNewUser, setIsNewUser] = useState<boolean | null>(null)
     const [appUser, setAppUser] = useState<AppUser | null>(null)
     const [recentConversations, setRecentConversations] = useState<Conversation[]>([])
+    const [loading, setLoading] = useState(true)
 
     useEffect(()=>{
         if(user && user.email){
             const checkUser = async (email: string) => {
-                await fetchUserFromDB(email, setIsNewUser, setAppUser)
+                await fetchUserFromDB(email, setIsNewUser, setAppUser, setLoading)
             }
             checkUser(user.email)
         }
@@ -27,12 +28,12 @@ const HomePage = ({user, logOut} : HomeProps) => {
 
     useEffect(()=>{
         if(appUser){
-            const unsub = subscribeConversation(appUser.id, setRecentConversations)
+            const unsub = subscribeConversation(appUser.id, setRecentConversations, setLoading)
             return unsub
         }
     }, [appUser])
 
-    if(isNewUser === null){
+    if(loading){
         return (
             <div className="w-full h-full flex justify-center items-center">
                 <span className="loading loading-ring loading-xl"></span>
@@ -44,7 +45,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
         <div className='w-full h-full flex justify-center items-center'>
             {user && user.email ? (
                 isNewUser ? (
-                    <NewUserModal setIsNewUser={setIsNewUser} email={user.email}/>
+                    <NewUserModal setIsNewUser={setIsNewUser} email={user.email} setAppUser={setAppUser}/>
                 ) : (
                     <div className='flex flex-row w-full h-full'>
                         <div className='w-1/4'>

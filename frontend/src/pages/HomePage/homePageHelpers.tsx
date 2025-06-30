@@ -11,13 +11,14 @@ export type AppUser = {
 
 export type Conversation = {
     id: string,
-    name: string
+    name: string,
 }
 
 export const fetchUserFromDB = async (
     email: string, 
     newUserSetter: (isNewUser: boolean)=>void, 
-    appUserSetter: (appUser: AppUser)=>void
+    appUserSetter: (appUser: AppUser)=>void,
+    setLoading: (isLoading: boolean)=>void
 ) => {
     try{
         const res = await axios.get(import.meta.env.VITE_BACKEND_API_URL + `user/${email}`)
@@ -27,20 +28,21 @@ export const fetchUserFromDB = async (
     }catch(e){
         if (axios.isAxiosError(e) && e.response?.status === 404) {
             newUserSetter(true);
+            setLoading(false)
         }else{
             console.log('Unknown error occurred')
         }
     }
 }
 
-export const createUser = async (email: string, username: string) => {
+export const createUser = async (email: string, username: string, setAppUser: (user: AppUser)=>void) => {
     try{
         const fields = {
             email,
             name: username
         }
         const res = await axios.post(import.meta.env.VITE_BACKEND_API_URL + `user`, fields)
-        console.log(res.data)
+        setAppUser(res.data.user)
     }catch(e){
         if (axios.isAxiosError(e)) {
             console.log(e.message)
@@ -50,7 +52,11 @@ export const createUser = async (email: string, username: string) => {
     }
 }
 
-export const subscribeConversation = (userId: string, setter: (conversations: Conversation[])=>void) => {
+export const subscribeConversation = (
+    userId: string, 
+    setter: (conversations: Conversation[])=>void,
+    setLoading: (isLoading: boolean)=>void
+) => {
     const queryRef = query(
       collection(db, 'conversations'),
       where('participants', 'array-contains', userId),
@@ -64,6 +70,7 @@ export const subscribeConversation = (userId: string, setter: (conversations: Co
             }
         )))
         setter(conversations)
+        setLoading(false)
     })
 
     return unsub
