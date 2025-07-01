@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { db } from '../../config/firebase'
 import { collection, where, query, onSnapshot, doc, getDoc, orderBy } from 'firebase/firestore'
+import type { Friend } from './components/FriendList'
 
 export type AppUser = {
     id: string,
@@ -14,12 +15,6 @@ export type Conversation = {
     name: string,
 }
 
-export type Friend = {
-    status: string
-    userId: string
-    username: string
-}
-
 export const fetchUserFromDB = async (
     email: string, 
     newUserSetter: (isNewUser: boolean)=>void, 
@@ -27,7 +22,7 @@ export const fetchUserFromDB = async (
     setLoading: (isLoading: boolean)=>void
 ) => {
     try{
-        const res = await axios.get(import.meta.env.VITE_BACKEND_API_URL + `user/${email}`)
+        const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}/user/${email}`)
         const data = res.data
         appUserSetter(data.user)
         newUserSetter(false)
@@ -47,7 +42,7 @@ export const createUser = async (email: string, username: string, setAppUser: (u
             email,
             name: username
         }
-        const res = await axios.post(import.meta.env.VITE_BACKEND_API_URL + `user`, fields)
+        const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/user`, fields)
         setAppUser(res.data.user)
     }catch(e){
         if (axios.isAxiosError(e)) {
@@ -100,9 +95,13 @@ const serializedName = async (name: string, participants: string[], userId: stri
     }
 }
 
-export const renderConversations = (conversations: Conversation[]) => {
+export const renderConversations = (conversations: Conversation[], setSelectedConversation: (conversationId: string | null)=>void) => {
   return conversations.map((c) => (
-    <li className='list-row no-list-divider' key={c.id}>
+    <li className='list-row no-list-divider cursor-pointer hover:bg-base-300 transition-colors' 
+    onClick={()=>{
+        setSelectedConversation(c.id)
+    }} 
+    key={c.id}>
         <p>{c.name}</p>
     </li>
   ));
@@ -136,6 +135,4 @@ export const mockFriendData: Friend[] = [
         username: 'Cen'
     
     }
-
-
 ]

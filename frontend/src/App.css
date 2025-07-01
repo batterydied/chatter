@@ -21,3 +21,7 @@
 button:hover{
   border-color: var(--color-accent);
 }
+
+.btn:active{
+  opacity: 0.8;
+}

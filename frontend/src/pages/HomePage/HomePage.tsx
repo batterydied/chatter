@@ -5,6 +5,7 @@ import { fetchUserFromDB, subscribeConversation, renderConversations, mockFriend
 import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
+import ConversationWindow from './components/ConversationWindow'
 
 type HomeProps = {
     user: User | null
@@ -17,7 +18,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [appUser, setAppUser] = useState<AppUser | null>(null)
     const [recentConversations, setRecentConversations] = useState<Conversation[]>([])
     const [loading, setLoading] = useState(true)
-    const [openConversation, setOpenConversation] = useState(false)
+    const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
 
     useEffect(()=>{
         if(user && user.email){
@@ -52,7 +53,8 @@ const HomePage = ({user, logOut} : HomeProps) => {
                     <div className='flex flex-row w-full h-full'>
                         <div className='w-[340px]'>
                             <ul className='list h-5/6 overflow-y-auto'>
-                                {renderConversations(recentConversations)}
+                                <button className='btn justify-start after:' onClick={()=>setSelectedConversation(null)}>Friends</button>
+                                {renderConversations(recentConversations, setSelectedConversation)}
                             </ul>
                             <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
                                 <div className='flex flex-row items-center'>
@@ -71,8 +73,8 @@ const HomePage = ({user, logOut} : HomeProps) => {
                         </div>
                         <div className='px-12'>
                             <button className='btn'>close friend list</button>
-                            {openConversation ? 
-                            <p>Opened</p>
+                            {selectedConversation ? 
+                            <ConversationWindow conversationId={selectedConversation}/>
                             : 
                             <FriendList friends={mockFriendData}/>}
                         </div>
