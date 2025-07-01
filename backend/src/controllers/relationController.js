@@ -24,7 +24,7 @@ class RelationController{
 
     async getReceivedPendingRequests(req, res){
         const { id } = req.params
-        const queryRef = query(collection(db, 'relation'), 
+        const queryRef = query(collection(db, 'relations'), 
         where('to', '==', id),
         where('status', '==', 'pending'))
         try{
@@ -42,7 +42,7 @@ class RelationController{
 
     async getBlockedUsers(req, res){
         const { id } = req.params
-        const queryRef = query(collection(db, 'relation'), 
+        const queryRef = query(collection(db, 'relations'), 
         where('to', '==', id),
         where('status', '==', 'blocked'))
         try{
@@ -60,17 +60,17 @@ class RelationController{
 
     async getFriends(req, res){
         const { id } = req.params
-        const queryRef = query(collection(db, 'relation'), 
+        const queryRef = query(collection(db, 'relations'), 
         where('to', '==', id),
         where('status', '==', 'friend'))
         try{
             const querySnapshot = await getDocs(queryRef)
-            const requests = querySnapshot.docs.map(request => ({
-                id: request.id,
-                data: request.data(),
-                createdAt: request.data().createdAt.toDate().toISOString()
+            const friends = querySnapshot.docs.map(friend => ({
+                id: friend.id,
+                data: friend.data(),
+                createdAt: friend.data().createdAt.toDate().toISOString()
             }))
-            res.status(200).json({status: "Success", requests})
+            res.status(200).json({status: "Success", friends})
         }catch(e){
             json.status(500).json({status: "Failure", message: 'Failed to get friended users', error: e instanceof Error ? e.message : e})
         }

@@ -109,30 +109,8 @@ export const renderConversations = (conversations: Conversation[], setSelectedCo
 
 export const renderFriends = (friends: Friend[]) => {
   return friends.map((f) => (
-    <li className='list-row' key={f.userId}>
+    <li className='list-row' key={f.relationshipId}>
         <p>{f.username}</p>
     </li>
   ));
 };
-
-
-export const mockFriendData: Friend[] = [
-    {
-        userId: '1',
-        status: 'online',
-        username: 'Ben'
-    
-    },
-    {
-        userId: '2',
-        status: 'online',
-        username: 'Len'
-    
-    },
-    {
-        userId: '3',
-        status: 'online',
-        username: 'Cen'
-    
-    }
-]

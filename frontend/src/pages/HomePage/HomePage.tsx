@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth'
 import { Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { fetchUserFromDB, subscribeConversation, renderConversations, mockFriendData } from './homePageHelpers'
+import { fetchUserFromDB, subscribeConversation, renderConversations } from './homePageHelpers'
 import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
@@ -75,9 +75,9 @@ const HomePage = ({user, logOut} : HomeProps) => {
                         </div>
                         <div className='px-12 w-full'>
                             {selectedConversation ? 
-                            <ConversationWindow conversationId={selectedConversation}/>
+                            <ConversationWindow conversationId={selectedConversation} userId={appUser!.id}/>
                             : 
-                            <FriendList friends={mockFriendData}/>}
+                            <FriendList userId={appUser!.id}/>}
                         </div>
                     </div>
                 )

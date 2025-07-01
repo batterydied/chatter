@@ -4,7 +4,8 @@ import { db } from '../../../config/firebase'
 import { doc, getDoc } from 'firebase/firestore'
 
 type ConversationWindowProps = {
-  conversationId: string
+  conversationId: string,
+  userId: string
 }
 
 type RawMessage = {
@@ -19,10 +20,11 @@ type SerializedMessage = {
   id: string
   text: string
   username: string
-  messageTime: string
+  messageTime: string,
+  senderId: string
 }
 
-const ConversationWindow = ({ conversationId }: ConversationWindowProps) => {
+const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
 
   useEffect(() => {
@@ -50,6 +52,7 @@ const ConversationWindow = ({ conversationId }: ConversationWindowProps) => {
               text: m.text,
               username,
               messageTime,
+              senderId: m.senderId
             }
           })
         )
@@ -76,7 +79,7 @@ const ConversationWindow = ({ conversationId }: ConversationWindowProps) => {
   return (
     <div className='w-full'>
       {messages.map((msg) => (
-        <div className="chat chat-start" key={msg.id}>
+        <div className={`chat ${userId == msg.senderId ? 'chat-end' : 'chat-start'}`} key={msg.id}>
           <div className="chat-header">
             {msg.username}
             <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
