@@ -67,7 +67,7 @@ export const subscribeConversation = (
         const conversations: Conversation[] = await Promise.all(snapshot.docs.map(async (doc)=>(
             {
                 id: doc.id,
-                name: await serializedName(doc.data().name, doc.data().participants, userId)
+                name: await serializeName(doc.data().name, doc.data().participants, userId)
             }
         )))
         setter(conversations)
@@ -77,7 +77,7 @@ export const subscribeConversation = (
     return unsub
 }
 
-const serializedName = async (name: string, participants: string[], userId: string) => {
+const serializeName = async (name: string, participants: string[], userId: string) => {
     const MAX_LENGTH = 15
     if(name == ""){
         const filteredIds = participants.filter((participant) => participant != userId)

@@ -51,9 +51,11 @@ const HomePage = ({user, logOut} : HomeProps) => {
                     <NewUserModal setIsNewUser={setIsNewUser} email={user.email} setAppUser={setAppUser}/>
                 ) : (
                     <div className='flex flex-row w-full h-full'>
-                        <div className='w-[340px]'>
+                        <div className='min-w-[360px]'>
                             <ul className='list h-5/6 overflow-y-auto'>
-                                <button className='btn justify-start after:' onClick={()=>setSelectedConversation(null)}>Friends</button>
+                                <li>
+                                    <button className='btn justify-start after:' onClick={()=>setSelectedConversation(null)}>Friends</button>
+                                </li>
                                 {renderConversations(recentConversations, setSelectedConversation)}
                             </ul>
                             <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
@@ -68,11 +70,10 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                         <p className='text-neutral-content'>status</p>
                                     </div>
                                 </div>
-                                <button className='btn btn-neutral' onClick={logOut}>Log out</button>
+                                <button className='btn btn-neutral' onClick={logOut}>L</button>
                             </div>
                         </div>
-                        <div className='px-12'>
-                            <button className='btn'>close friend list</button>
+                        <div className='px-12 w-full'>
                             {selectedConversation ? 
                             <ConversationWindow conversationId={selectedConversation}/>
                             : 
