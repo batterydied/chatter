@@ -43,7 +43,17 @@ const FriendList = ({userId}: FriendProps) => {
     }, [userId])
 
     return (
-        <ul className='list bg-base-100 rounded-box shadow-md'>
+        <ul className='list justify-start'>
+            <li>
+                <div className='flex items-start space-x-2'>
+                    <button className='btn pointer-events-none cursor-default bg-base-300 border-none shadow-none'>
+                        <span>Friends</span>
+                    </button>
+                    <button className='btn bg-base-300 shadow-none border-0 hover:border hover:border-base-accent'>Online</button>
+                    <button className='btn bg-base-300 shadow-none border-0 hover:border hover:border-base-accent'>All</button>
+                    <button className='btn bg-primary border-none hover:opacity-80 rounded-lg'>Add Friend</button>
+                </div>
+            </li>
             {renderFriends(friends)}
         </ul>
     )

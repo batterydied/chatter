@@ -73,7 +73,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <button className='btn btn-neutral' onClick={logOut}>L</button>
                             </div>
                         </div>
-                        <div className='px-12 w-full'>
+                        <div className='ml-2 p-2 w-full bg-base-300'>
                             {selectedConversation ? 
                             <ConversationWindow conversationId={selectedConversation} userId={appUser!.id}/>
                             : 

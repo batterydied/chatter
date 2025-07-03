@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { doc, getDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, onSnapshot, orderBy, query } from 'firebase/firestore'
+import type { Firestore, Timestamp } from 'firebase/firestore';
 
 type ConversationWindowProps = {
   conversationId: string,
@@ -10,7 +11,7 @@ type ConversationWindowProps = {
 
 type RawMessage = {
   id: string
-  createdAt: string
+  createdAt: string | Timestamp //if you get it from backend api, it's a string; if you use firebase snapshot, it's a timestamp
   senderId: string
   text: string
   type: string
@@ -21,54 +22,104 @@ type SerializedMessage = {
   text: string
   username: string
   messageTime: string,
-  senderId: string
+  senderId: string,
+  timestamp: Date
 }
 
 const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const fetchMessages = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`
-        )
+  const [inputMessage, setInputMessage] = useState('')
 
-        const rawMessages: RawMessage[] = res.data.messages
+  async function serializeMessages(rawMessages: RawMessage[], db: Firestore) {
+    return await Promise.all(
+      rawMessages.map(async (m) => {
+        const docRef = doc(db, 'users', m.senderId);
+        const docSnap = await getDoc(docRef);
+        const username = docSnap.exists()
+          ? docSnap.data().username
+          : 'Unknown User';
+        
+        
+        const timestamp = typeof m.createdAt === 'string' ? new Date(m.createdAt) : m.createdAt.toDate()
+        const messageTime = formatMessageTime(timestamp)
+        return {
+          id: m.id,
+          text: m.text,
+          username,
+          messageTime,
+          senderId: m.senderId,
+          timestamp
+        };
+      })
+    );
+  }
 
-        const serialized = await Promise.all(
-          rawMessages.map(async (m) => {
-            const docRef = doc(db, 'users', m.senderId)
-            const docSnap = await getDoc(docRef)
-            console.log(docSnap.data())
-            const username = docSnap.exists()
-              ? docSnap.data().username
-              : 'Unknown User'
+  const fetchMessages = useCallback(async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`
+      )
 
-            const messageTime = formatMessageTime(new Date(m.createdAt))
+      const rawMessages: RawMessage[] = res.data.messages
 
-            return {
-              id: m.id,
-              text: m.text,
-              username,
-              messageTime,
-              senderId: m.senderId
-            }
-          })
-        )
+      const serialized = await serializeMessages(rawMessages, db)
 
-        setMessages(serialized)
-      } catch (e) {
-        if (axios.isAxiosError(e)) {
-          console.log(e.message)
-        } else {
-          console.log('Unknown error occurred')
-        }
+      setMessages(serialized)
+    } catch (e) {
+      if (axios.isAxiosError(e)) {
+        console.log(e.message)
+      } else {
+        console.log('Unknown error occurred')
       }
     }
-
-    fetchMessages()
   }, [conversationId])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if(inputMessage){
+      console.log(inputMessage)
+      uploadMessage(conversationId, userId, inputMessage)
+      setInputMessage('')
+    }
+  }
+
+  useEffect(() => {
+    fetchMessages()
+  }, [fetchMessages])
+
+  useEffect(()=>{
+    inputRef.current?.focus()
+  }, [conversationId])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  useEffect(()=>{
+    const queryRef = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt'))
+    const unsub = onSnapshot(queryRef, async (snapshot)=>{
+    const rawMessages: RawMessage[] = snapshot.docs.map((doc)=>{
+      const data = doc.data()
+      return {
+          id: doc.id,
+          createdAt: data.createdAt,
+          senderId: data.senderId,
+          text: data.text,
+          type: data.type
+        }
+      })
+
+      const serializedMessages = await serializeMessages(rawMessages, db)
+      console.log(serializedMessages)
+
+      setMessages(serializedMessages)
+    })
+    return unsub
+  }, [conversationId])
+
   if(!messages){
     return (
         <div className="w-full h-full flex justify-center items-center">
@@ -77,16 +128,14 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     );
   }
   return (
-    <div className='w-full'>
-      {messages.map((msg) => (
-        <div className={`chat ${userId == msg.senderId ? 'chat-end' : 'chat-start'}`} key={msg.id}>
-          <div className="chat-header">
-            {msg.username}
-            <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-          </div>
-          <div className="chat-bubble">{msg.text}</div>
-        </div>
-      ))}
+    <div className='h-full w-full flex flex-col'>
+      <div className='flex-1 overflow-y-auto'>
+        {renderMessages(messages, userId)}
+        <div ref={bottomRef}></div>
+      </div>
+      <form onSubmit={handleSubmit}>
+        <input value={inputMessage} onChange={(e)=>setInputMessage(e.target.value)} type="text" className="input input-md items-end w-full focus:outline-0" ref={inputRef}/>
+      </form>
     </div>
   )
 }
@@ -115,5 +164,46 @@ const formatMessageTime = (date: Date): string => {
     })
   }
 }
+
+const uploadMessage = async (conversationId: string, userId: string, inputMessage: string) => {
+  try{
+    const message = {
+      senderId: userId,
+      type: 'text',
+      text: inputMessage
+    }
+    await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`, message)
+  }catch(e){
+    if(axios.isAxiosError(e)){
+      console.log(e.message)
+    }else{
+      console.log('Unknown error occurred')
+    }
+  }
+}
+
+const renderMessages = (messages: SerializedMessage[], userId: string) => {
+  return messages.map((msg, i) => {
+    const prev = messages[i - 1];
+    const isGrouped =
+      prev &&
+      prev.senderId === msg.senderId &&
+      Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000;
+
+    return (
+      <div className={`chat ${userId === msg.senderId ? 'chat-end' : 'chat-start'}`} key={msg.id}>
+        {!isGrouped && (
+          <div className="chat-header">
+            {msg.username}
+            <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
+          </div>
+        )}
+        <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>{msg.text}</div>
+      </div>
+    );
+  });
+};
+
+
 
 export default ConversationWindow

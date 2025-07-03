@@ -109,7 +109,7 @@ export const renderConversations = (conversations: Conversation[], setSelectedCo
 
 export const renderFriends = (friends: Friend[]) => {
   return friends.map((f) => (
-    <li className='list-row' key={f.relationshipId}>
+    <li className='rounded-none list-row border-b border-b-base-100' key={f.relationshipId}>
         <p>{f.username}</p>
     </li>
   ));
