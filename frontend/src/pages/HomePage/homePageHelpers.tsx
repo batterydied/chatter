@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { db } from '../../config/firebase'
 import { collection, where, query, onSnapshot, doc, getDoc, orderBy } from 'firebase/firestore'
-import type { Friend } from './components/FriendList'
 
 export type AppUser = {
     id: string,
@@ -107,10 +106,3 @@ export const renderConversations = (conversations: Conversation[], setSelectedCo
   ));
 };
 
-export const renderFriends = (friends: Friend[]) => {
-  return friends.map((f) => (
-    <li className='rounded-none list-row border-b border-b-base-100' key={f.relationshipId}>
-        <p>{f.username}</p>
-    </li>
-  ));
-};

@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react"
-import { renderFriends } from "../homePageHelpers"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { doc, getDoc } from 'firebase/firestore'
 
-type FriendProps = {
+type FriendListProps = {
     userId: string
 }
 
@@ -21,8 +20,9 @@ export type Friend = {
     username: string
 }
 
-const FriendList = ({userId}: FriendProps) => {
+const FriendList = ({userId}: FriendListProps) => {
     const [friends, setFriends] = useState<Friend[]>([])
+    const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
 
     useEffect(()=>{
         const retrieveFriends = async () => {
@@ -44,7 +44,7 @@ const FriendList = ({userId}: FriendProps) => {
 
     return (
         <ul className='list justify-start'>
-            <li>
+            <li className='mb-2 border-b border-base-100 pb-2'>
                 <div className='flex items-start space-x-2'>
                     <button className='btn pointer-events-none cursor-default bg-base-300 border-none shadow-none'>
                         <span>Friends</span>
@@ -73,4 +73,13 @@ const serializeFriends = async (rawFriends: RawFriend[]) => {
         }
     }))
 }
+
+const renderFriends = (friends: Friend[]) => {
+  return friends.map((f) => (
+    <li onClick={()=>openConversation()} className='rounded-none list-row border-b border-b-base-100 cursor-pointer hover:bg-base-100 hover:rounded-xl' key={f.relationshipId}>
+        <p>{f.username}</p>
+    </li>
+  ));
+};
+
 export default FriendList

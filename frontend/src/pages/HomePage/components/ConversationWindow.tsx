@@ -134,7 +134,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         <div ref={bottomRef}></div>
       </div>
       <form onSubmit={handleSubmit}>
-        <input value={inputMessage} onChange={(e)=>setInputMessage(e.target.value)} type="text" className="input input-md items-end w-full focus:outline-0" ref={inputRef}/>
+        <input value={inputMessage} onChange={(e)=>setInputMessage(e.target.value)} type="text" className="input input-md items-end w-full focus:outline-0 mt-2" ref={inputRef}/>
       </form>
     </div>
   )
