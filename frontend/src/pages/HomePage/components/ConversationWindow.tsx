@@ -6,7 +6,7 @@ import type { Firestore, Timestamp } from 'firebase/firestore';
 
 type ConversationWindowProps = {
   conversationId: string,
-  userId: string
+  userId: string,
 }
 
 type RawMessage = {

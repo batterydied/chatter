@@ -6,7 +6,8 @@ const ConversationSchema = z.object({
     mutedBy: z.array(z.string()).default([]),
     createdAt: z.any().optional(),
     lastMessageTime: z.any().optional(),
-    name: z.string().default('')
+    name: z.string().default(''),
+    directConversationId: z.string(),
 })
 
 export default ConversationSchema

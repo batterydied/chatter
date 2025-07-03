@@ -77,7 +77,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                             {selectedConversation ? 
                             <ConversationWindow conversationId={selectedConversation} userId={appUser!.id}/>
                             : 
-                            <FriendList userId={appUser!.id}/>}
+                            <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>}
                         </div>
                     </div>
                 )

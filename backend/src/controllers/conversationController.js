@@ -7,11 +7,12 @@ class ConversationController{
     async createConversation(req, res){
         const collectionRef = collection(db, 'conversations')
 
-        const { participants, name } = req.body
+        const { participants, name, isDirect } = req.body
         const conversation = {
             name,
             participants,
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            directConversationId: isDirect ? [...participants].sort().join('_') : ''
         }
 
         try{
@@ -19,7 +20,8 @@ class ConversationController{
             const createdField = {
                 name: conversation.name ?? '',
                 participants: conversation.participants,
-                createdAt: conversation.createdAt
+                createdAt: conversation.createdAt,
+                directConversationId: conversation.directConversationId
             }
             const docRef = await addDoc(collectionRef, createdField)
             const docSnapshot = await getDoc(docRef)

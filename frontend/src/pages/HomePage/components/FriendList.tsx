@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, query, collection, where, getDocs } from 'firebase/firestore'
 
 type FriendListProps = {
-    userId: string
+    userId: string,
+    setSelectedConversation: (conversationId: string) => void
 }
 
 type RawFriend = {
@@ -20,7 +21,7 @@ export type Friend = {
     username: string
 }
 
-const FriendList = ({userId}: FriendListProps) => {
+const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [friends, setFriends] = useState<Friend[]>([])
     const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
 
@@ -41,7 +42,39 @@ const FriendList = ({userId}: FriendListProps) => {
         }
         retrieveFriends()
     }, [userId])
+    const renderFriends = (friends: Friend[]) => {
+        return friends.map((f) => (
+            <li onClick={async ()=> await openConversation(f.friendId, userId)} className='rounded-none list-row border-b border-b-base-100 cursor-pointer hover:bg-base-100 hover:rounded-xl' key={f.relationshipId}>
+                <p>{f.username}</p>
+            </li>
+        ));
+    };
 
+    const openConversation = async (userId1: string, userId2: string) => {
+        const queryRef = query(collection(db, 'conversations'), where('directConversationId', '==', [userId1, userId2].sort().join('_')))
+
+        try{
+            const docSnapshot = await getDocs(queryRef)
+
+            if(docSnapshot.empty){
+                const reqBody = {
+                    participants: [userId1, userId2],
+                    isDirect: true
+                }
+                const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation`, reqBody)
+                setSelectedConversation(res.data.conversationId)
+            }else{
+                setSelectedConversation(docSnapshot.docs[0].id)
+            }
+        }catch(e){
+            if(axios.isAxiosError(e)){
+                console.log(e)
+            }else{
+                console.log('Unknown error occurred')
+            }
+        }
+
+    }
     return (
         <ul className='list justify-start'>
             <li className='mb-2 border-b border-base-100 pb-2'>
@@ -74,12 +107,5 @@ const serializeFriends = async (rawFriends: RawFriend[]) => {
     }))
 }
 
-const renderFriends = (friends: Friend[]) => {
-  return friends.map((f) => (
-    <li onClick={()=>openConversation()} className='rounded-none list-row border-b border-b-base-100 cursor-pointer hover:bg-base-100 hover:rounded-xl' key={f.relationshipId}>
-        <p>{f.username}</p>
-    </li>
-  ));
-};
 
 export default FriendList
