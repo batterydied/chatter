@@ -44,7 +44,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     }, [userId])
     const renderFriends = (friends: Friend[]) => {
         return friends.map((f) => (
-            <li onClick={async ()=> await openConversation(f.friendId, userId)} className='rounded-none list-row border-b border-b-base-100 cursor-pointer hover:bg-base-100 hover:rounded-xl' key={f.relationshipId}>
+            <li onClick={async ()=> await openConversation(f.friendId, userId)} className='rounded-none list-row border-b border-b-base-100 cursor-pointer hover:bg-neutral hover:rounded-xl' key={f.relationshipId}>
                 <p>{f.username}</p>
             </li>
         ));

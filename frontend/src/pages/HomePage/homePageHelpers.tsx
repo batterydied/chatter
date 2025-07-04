@@ -94,15 +94,22 @@ const serializeName = async (name: string, participants: string[], userId: strin
     }
 }
 
-export const renderConversations = (conversations: Conversation[], setSelectedConversation: (conversationId: string | null)=>void) => {
-  return conversations.map((c) => (
-    <li className='list-row no-list-divider cursor-pointer hover:bg-base-300 transition-colors' 
-    onClick={()=>{
-        setSelectedConversation(c.id)
-    }} 
-    key={c.id}>
-        <p>{c.name}</p>
-    </li>
-  ));
+export const renderConversations = (
+    conversations: Conversation[], 
+    setSelectedConversation: (conversationId: string | null)=>void,
+    selectedConversation: string | null
+) => {
+  return conversations.map((c) => {
+    const highlightConversation = selectedConversation == c.id
+    return (
+        <li className={`list-row no-list-divider cursor-pointer transition-colors hover:bg-neutral ${highlightConversation ? 'bg-base-300' : ''}`}
+        onClick={()=>{
+            setSelectedConversation(c.id)
+        }} 
+        key={c.id}>
+            <p>{c.name}</p>
+        </li>
+    )
+    });
 };
 

@@ -30,7 +30,9 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
 
   async function serializeMessages(rawMessages: RawMessage[], db: Firestore) {
@@ -95,7 +97,9 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   }, [conversationId])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if(shouldScrollToBottom){
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
 
   useEffect(()=>{

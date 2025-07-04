@@ -56,7 +56,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <li>
                                     <button className='btn justify-start after:' onClick={()=>setSelectedConversation(null)}>Friends</button>
                                 </li>
-                                {renderConversations(recentConversations, setSelectedConversation)}
+                                {renderConversations(recentConversations, setSelectedConversation, selectedConversation)}
                             </ul>
                             <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
                                 <div className='flex flex-row items-center'>
