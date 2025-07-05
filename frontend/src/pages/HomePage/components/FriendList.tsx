@@ -35,7 +35,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 if (axios.isAxiosError(e)) {
                     console.log(e.message)
                 } else {
-                    console.log('Unknown error occurred')
+                    console.log(e)
                 }
             }
 

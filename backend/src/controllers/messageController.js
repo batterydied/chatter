@@ -1,5 +1,5 @@
 import { db } from '../config/firebase.js'
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, getDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, getDoc, doc, serverTimestamp, updateDoc, startAfter, limit } from "firebase/firestore"
 import MessageSchema from '../models/messageModel.js'
 
 class MessageController{
@@ -133,6 +133,46 @@ class MessageController{
             res.status(500).json({status: 'Failure', message: `Failed to delete all messages for conversation ${conversationId}`})
         }
     }
+
+    async getMessagesByPagination(req, res) {
+        const { conversationId } = req.params
+        const { prevMessageId } = req.query
+        const size = parseInt(req.query.size)
+
+        try {
+            const messagesRef = collection(db, 'conversations', conversationId, 'messages')
+            let q
+
+            if (prevMessageId) {
+                const prevDocRef = doc(messagesRef, prevMessageId)
+                const prevDocSnap = await getDoc(prevDocRef)
+
+                if (!prevDocSnap.exists()) {
+                    return res.status(404).json({ error: 'Previous message not found' })
+                }
+
+                q = query(messagesRef, orderBy('createdAt', 'desc'), startAfter(prevDocSnap), limit(size))
+            } else {
+                q = query(messagesRef, orderBy('createdAt', 'desc'), limit(size))
+            }
+
+            const snapshot = await getDocs(q)
+
+            const messages = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt.toDate().toISOString()
+            })).reverse()
+
+            const noMore = snapshot.size < size
+
+            return res.status(200).json({status: 'Success', messages, noMore })
+        } catch (err) {
+            console.error(err)
+            return res.status(500).json({status: 'Failure', message: `Internal server failure`})
+        }
+    }
+
     
 }
 

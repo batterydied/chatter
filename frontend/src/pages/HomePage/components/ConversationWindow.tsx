@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { collection, doc, getDoc, onSnapshot, orderBy, query } from 'firebase/firestore'
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import type { Firestore, Timestamp } from 'firebase/firestore';
 
 type ConversationWindowProps = {
@@ -59,14 +59,15 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     );
   }
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (size: number, prevMessageId: string | null) => {
+    const params = {size, prevMessageId}
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`
+        `${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/page`,
+        {params}
       )
 
       const rawMessages: RawMessage[] = res.data.messages
-
       const serialized = await serializeMessages(rawMessages, db)
 
       setMessages(serialized)
@@ -74,7 +75,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       if (axios.isAxiosError(e)) {
         console.log(e.message)
       } else {
-        console.log('Unknown error occurred')
+        console.log(e)
       }
     }
   }, [conversationId])
@@ -89,7 +90,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   }
 
   useEffect(() => {
-    fetchMessages()
+    setMessages([])
+    fetchMessages(15, null)
   }, [fetchMessages])
 
   useEffect(()=>{
@@ -103,7 +105,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   }, [messages])
 
   useEffect(()=>{
-    const queryRef = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt'))
+    const queryRef = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(1))
     const unsub = onSnapshot(queryRef, async (snapshot)=>{
     const rawMessages: RawMessage[] = snapshot.docs.map((doc)=>{
       const data = doc.data()
@@ -117,9 +119,14 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       })
 
       const serializedMessages = await serializeMessages(rawMessages, db)
-      console.log(serializedMessages)
 
-      setMessages(serializedMessages)
+      setMessages((prev) => {
+        const newMessage = serializedMessages[0]
+        if (!newMessage) return prev
+        const exists = prev.some((m) => m.id === newMessage.id)
+        if (exists) return prev
+        return [...prev, newMessage]
+      })
     })
     return unsub
   }, [conversationId])
