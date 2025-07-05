@@ -30,12 +30,14 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true)
-  const [hasMore, setHasMore] = useState(true)
+  const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
+  const [earliestMessageId, setEarliestMessageId] = useState<string | null>(null)
 
-  async function serializeMessages(rawMessages: RawMessage[], db: Firestore) {
+  const serializeMessages = async (rawMessages: RawMessage[], db: Firestore) => {
     return await Promise.all(
       rawMessages.map(async (m) => {
         const docRef = doc(db, 'users', m.senderId);
@@ -68,15 +70,21 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       )
 
       const rawMessages: RawMessage[] = res.data.messages
-      const serialized = await serializeMessages(rawMessages, db)
+      setHasMore(!res.data.noMore)
 
+      const serialized = await serializeMessages(rawMessages, db)
+      setEarliestMessageId(serialized[0].id)
       setMessages(serialized)
+
+      return(serialized)
+
     } catch (e) {
       if (axios.isAxiosError(e)) {
         console.log(e.message)
       } else {
         console.log(e)
       }
+      return []
     }
   }, [conversationId])
 
@@ -90,9 +98,12 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   }
 
   useEffect(() => {
-    setMessages([])
-    fetchMessages(15, null)
-  }, [fetchMessages])
+    const init = async () => {
+      setMessages([])
+      await fetchMessages(15, null)
+    }
+    init()
+}, [fetchMessages])
 
   useEffect(()=>{
     inputRef.current?.focus()
@@ -100,9 +111,9 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
   useEffect(() => {
     if(shouldScrollToBottom){
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      bottomRef.current?.scrollIntoView({ behavior: 'auto' })
     }
-  }, [messages])
+  }, [messages, shouldScrollToBottom])
 
   useEffect(()=>{
     const queryRef = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(1))
@@ -131,6 +142,66 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     return unsub
   }, [conversationId])
 
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer) return
+
+    const fetchMoreMessages = async () => {
+      if (!earliestMessageId || loadingMore || !hasMore) return
+
+      const oldScrollHeight = scrollContainer.scrollHeight
+
+      setLoadingMore(true)
+      setShouldScrollToBottom(false)
+
+      try {
+        const axiosParams = {
+          params: {
+            size: 15,
+            prevMessageId: earliestMessageId,
+          },
+        }
+
+        const res = await axios.get(
+          `${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/page`,
+          axiosParams
+        )
+
+        const rawMessages: RawMessage[] = res.data.messages
+        const serialized = await serializeMessages(rawMessages, db)
+
+        setMessages((prev) => [...serialized, ...prev])
+        if (serialized.length > 0) {
+          setEarliestMessageId(serialized[0].id)
+        }
+
+        setHasMore(!res.data.noMore)
+        requestAnimationFrame(() => {
+          const newScrollHeight = scrollContainer.scrollHeight
+          scrollContainer.scrollTop += newScrollHeight - oldScrollHeight
+        })
+      } catch (e) {
+        if (axios.isAxiosError(e)) {
+          console.log(e.message)
+        } else {
+          console.log(e)
+        }
+      } finally {
+        setLoadingMore(false)
+      }
+    }
+
+    const handleScroll = () => {
+      if (scrollContainer.scrollTop < 50 && !loadingMore && hasMore) {
+        fetchMoreMessages()
+      }
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll)
+    return () => scrollContainer.removeEventListener('scroll', handleScroll)
+  }, [earliestMessageId, hasMore, loadingMore, conversationId])
+
+
   if(!messages){
     return (
         <div className="w-full h-full flex justify-center items-center">
@@ -140,7 +211,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   }
   return (
     <div className='h-full w-full flex flex-col'>
-      <div className='flex-1 overflow-y-auto'>
+      <div className='flex-1 overflow-y-auto' ref={scrollContainerRef}>
+        {loadingMore && <span className="loading loading-dots loading-md"></span>}
         {renderMessages(messages, userId)}
         <div ref={bottomRef}></div>
       </div>
