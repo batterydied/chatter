@@ -28,6 +28,7 @@ type SerializedMessage = {
 
 const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
+  const [loading, setLoading] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -76,6 +77,9 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       setEarliestMessageId(serialized[0].id)
       setMessages(serialized)
 
+      setShouldScrollToBottom(true)
+      setLoading(false)
+
       return(serialized)
 
     } catch (e) {
@@ -99,6 +103,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
   useEffect(() => {
     const init = async () => {
+      setLoading(true)
       setMessages([])
       await fetchMessages(15, null)
     }
@@ -112,8 +117,9 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   useEffect(() => {
     if(shouldScrollToBottom){
       bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+      setShouldScrollToBottom(false)
     }
-  }, [messages, shouldScrollToBottom])
+  }, [shouldScrollToBottom])
 
   useEffect(()=>{
     const queryRef = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(1))
@@ -209,6 +215,13 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         </div>
     );
   }
+  if(loading){
+    return (
+      <div className="w-full h-full flex justify-center items-center">
+        <span className="loading loading-ring loading-xl"></span>
+      </div>
+    )
+  } 
   return (
     <div className='h-full w-full flex flex-col'>
       <div className='flex-1 overflow-y-auto' ref={scrollContainerRef}>
@@ -266,26 +279,33 @@ const uploadMessage = async (conversationId: string, userId: string, inputMessag
 }
 
 const renderMessages = (messages: SerializedMessage[], userId: string) => {
-  return messages.map((msg, i) => {
-    const prev = messages[i - 1];
-    const isGrouped =
-      prev &&
-      prev.senderId === msg.senderId &&
-      Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000;
+  if(messages.length != 0){
+    return messages.map((msg, i) => {
+      const prev = messages[i - 1];
+      const isGrouped =
+        prev &&
+        prev.senderId === msg.senderId &&
+        Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000;
 
+      return (
+        <div className={`chat ${userId === msg.senderId ? 'chat-end' : 'chat-start'}`} key={msg.id}>
+          {!isGrouped && (
+            <div className="chat-header">
+              {msg.username}
+              <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
+            </div>
+          )}
+          <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>{msg.text}</div>
+        </div>
+      )
+    })
+  }else{
     return (
-      <div className={`chat ${userId === msg.senderId ? 'chat-end' : 'chat-start'}`} key={msg.id}>
-        {!isGrouped && (
-          <div className="chat-header">
-            {msg.username}
-            <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-          </div>
-        )}
-        <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>{msg.text}</div>
-      </div>
-    );
-  });
-};
+      <div>
+        <span>This is the beginning of your direct message history!</span> 
+      </div>)
+  } 
+}
 
 
 
