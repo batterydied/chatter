@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { doc, getDoc, query, collection, where, getDocs } from 'firebase/firestore'
@@ -24,6 +24,24 @@ export type Friend = {
 const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [friends, setFriends] = useState<Friend[]>([])
     const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
+    const [selectedOnline, setSelectedOnline] = useState<boolean>(true)
+    const onlineFriendRef = useRef<HTMLButtonElement>(null)
+    const allFriendRef = useRef<HTMLButtonElement>(null)
+
+    const handleOnlineFriends = ()=>{
+        setSelectedOnline(true)
+        onlineFriendRef.current?.focus()
+    }
+
+    const handleAllFriends = ()=>{
+        setSelectedOnline(false)
+        allFriendRef.current?.focus()
+    }
+    useEffect(()=>{
+        if(selectedOnline){
+            onlineFriendRef.current?.focus()
+        }
+    }, [selectedOnline])
 
     useEffect(()=>{
         const retrieveFriends = async () => {
@@ -82,8 +100,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     <button className='btn pointer-events-none cursor-default bg-base-300 border-none shadow-none'>
                         <span>Friends</span>
                     </button>
-                    <button className='btn bg-base-300 shadow-none border-0 hover:border hover:border-base-accent'>Online</button>
-                    <button className='btn bg-base-300 shadow-none border-0 hover:border hover:border-base-accent'>All</button>
+                    <button ref={onlineFriendRef} className='btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:border-base-accent focus:bg-base-100' onClick={handleOnlineFriends}>Online</button>
+                    <button ref={allFriendRef} className='btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:border-base-accent focus:bg-base-100' onClick={handleAllFriends}>All</button>
                     <button className='btn bg-primary border-none hover:opacity-80 rounded-lg'>Add Friend</button>
                 </div>
             </li>
