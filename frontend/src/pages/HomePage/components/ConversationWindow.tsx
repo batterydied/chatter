@@ -114,39 +114,62 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     inputRef.current?.focus()
   }, [conversationId])
 
-  useEffect(() => {
-    if(shouldScrollToBottom){
-      bottomRef.current?.scrollIntoView({ behavior: 'auto' })
-      setShouldScrollToBottom(false)
-    }
-  }, [shouldScrollToBottom])
+  const isUserNearBottom = useCallback((container: HTMLDivElement | null, threshold = 100): boolean => {
+    if (!container) return false;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    return scrollHeight - (scrollTop + clientHeight) <= threshold;
+  }, []);
 
-  useEffect(()=>{
-    const queryRef = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(1))
-    const unsub = onSnapshot(queryRef, async (snapshot)=>{
-    const rawMessages: RawMessage[] = snapshot.docs.map((doc)=>{
-      const data = doc.data()
-      return {
+  useEffect(() => {
+    const queryRef = query(
+      collection(db, 'conversations', conversationId, 'messages'),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    );
+    
+    const unsub = onSnapshot(queryRef, async (snapshot) => {
+      const rawMessages: RawMessage[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
           id: doc.id,
           createdAt: data.createdAt,
           senderId: data.senderId,
           text: data.text,
           type: data.type
-        }
-      })
+        };
+      });
 
-      const serializedMessages = await serializeMessages(rawMessages, db)
-
+      const serializedMessages = await serializeMessages(rawMessages, db);
+      
       setMessages((prev) => {
-        const newMessage = serializedMessages[0]
-        if (!newMessage) return prev
-        const exists = prev.some((m) => m.id === newMessage.id)
-        if (exists) return prev
-        return [...prev, newMessage]
-      })
-    })
-    return unsub
-  }, [conversationId])
+        const newMessage = serializedMessages[0];
+        if (!newMessage) return prev;
+        
+        const exists = prev.some((m) => m.id === newMessage.id);
+        if (exists) return prev;
+        
+        // Check scroll position before updating messages
+        const container = scrollContainerRef.current;
+        const nearBottom = isUserNearBottom(container);
+        setShouldScrollToBottom(nearBottom);
+        
+        return [...prev, newMessage];
+      });
+    });
+    
+    return unsub;
+  }, [conversationId, isUserNearBottom]);
+
+  useEffect(() => {
+    if (shouldScrollToBottom && messages.length > 0) {
+      const timer = setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 0);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [shouldScrollToBottom, messages]);
+
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current

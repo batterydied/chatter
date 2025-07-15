@@ -9,7 +9,6 @@ class UserController{
             email: req.body.email,
             createdAt: serverTimestamp(),
             isOnline: true,
-            tabsOpened: 0
         }
         try{
             UserSchema.parse(user);
@@ -110,44 +109,6 @@ class UserController{
             await updateDoc(docRef, {
                 isOnline: updatedFields.isOnline,
                 username: updatedFields.username || docSnap.data().username
-            })
-            res.status(200).json({status: 'Success', message: 'User updated'})
-        }catch(e){
-            res.status(500).json({status: 'Failure', message: 'Failed to update user', error: e instanceof Error ? e.message : e})
-        }
-    }
-
-    async openTabById(req, res){
-        const docRef = doc(db, 'users', req.params.id)
-        try{
-            const docSnap = await getDoc(docRef)
-            if(!docSnap.exists()){
-                res.status(404).json({status: 'Failed', message: 'User not found'})
-                return
-            }
-            const tabsOpened = docSnap.data().tabsOpened + 1
-            await updateDoc(docRef, {
-                tabsOpened,
-                isOnline: tabsOpened > 0
-            })
-            res.status(200).json({status: 'Success', message: 'User updated'})
-        }catch(e){
-            res.status(500).json({status: 'Failure', message: 'Failed to update user', error: e instanceof Error ? e.message : e})
-        }
-    }
-
-    async closeTabById(req, res){
-        const docRef = doc(db, 'users', req.params.id)
-        try{
-            const docSnap = await getDoc(docRef)
-            if(!docSnap.exists()){
-                res.status(404).json({status: 'Failed', message: 'User not found'})
-                return
-            }
-            const tabsOpened = docSnap.data().tabsOpened - 1
-            await updateDoc(docRef, {
-                tabsOpened,
-                isOnline: tabsOpened > 0
             })
             res.status(200).json({status: 'Success', message: 'User updated'})
         }catch(e){

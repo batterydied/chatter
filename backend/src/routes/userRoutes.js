@@ -3,10 +3,6 @@ import UserController from '../controllers/userControllers.js'
 
 const router = express.Router()
 
-router.post('/:id/openTab', UserController.openTabById)
-
-router.post('/:id/closeTab', UserController.closeTabById)
-
 router.post('/:id', UserController.updateUserById)
 
 

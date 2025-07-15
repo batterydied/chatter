@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth'
 import { Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { fetchUserFromDB, subscribeConversation, renderConversations, useTabCloseStatus, closeTab } from './homePageHelpers'
+import { fetchUserFromDB, subscribeConversation, renderConversations } from './homePageHelpers'
 import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
@@ -20,8 +20,6 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [loading, setLoading] = useState(true)
     const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
 
-    useTabCloseStatus(appUser?.id)
-
     useEffect(()=>{
         if(user && user.email){
             const checkUser = async (email: string) => {
@@ -37,13 +35,6 @@ const HomePage = ({user, logOut} : HomeProps) => {
             return unsub
         }
     }, [appUser])
-
-    const handleLogOut = async () => {
-        if(appUser){
-            await closeTab(appUser.id)
-            logOut()
-        }
-    }
 
     if(loading){
         return (
@@ -79,7 +70,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                         <p className='text-neutral-content'>status</p>
                                     </div>
                                 </div>
-                                <button className='btn btn-neutral' onClick={handleLogOut}>L</button>
+                                <button className='btn btn-neutral' onClick={logOut}>L</button>
                             </div>
                         </div>
                         <div className='ml-2 p-2 w-full bg-base-300'>
