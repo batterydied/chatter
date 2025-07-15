@@ -1,6 +1,6 @@
 import UserSchema from "../models/userModel.js"
 import { db } from '../config/firebase.js'
-import { collection, addDoc, getDocs, getDoc, query, where, deleteDoc, serverTimestamp, doc } from "firebase/firestore"
+import { collection, addDoc, getDocs, getDoc, query, where, deleteDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore"
 
 class UserController{
     async createUser(req, res){
@@ -8,7 +8,8 @@ class UserController{
             username: req.body.name,
             email: req.body.email,
             createdAt: serverTimestamp(),
-            status: 'Online'
+            isOnline: true,
+            tabsOpened: 0
         }
         try{
             UserSchema.parse(user);
@@ -49,12 +50,30 @@ class UserController{
         }
     }
 
+    async retrieveUserByEmail(req, res){
+        const queryRef = query(collection(db, 'users'), where('email', '==', req.params.email))
+        try{
+            const querySnapshot = await getDocs(queryRef)
+            if(querySnapshot.empty){
+                res.status(404).json({status: 'Failed', message: 'User not found'})
+            }else{ 
+                const data = [querySnapshot.docs[0]].map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    createdAt: doc.data().createdAt.toDate().toISOString()
+                }))[0]
+                res.status(200).json({status: 'Success', user: data})
+            }
+        }catch(e){
+            res.status(500).json({status: 'Failure', message: 'Failed to retrieve user', error: e instanceof Error ? e.message : e})
+        }
+    }
 
     async deleteUserById(req, res){
         try{
             const docRef = doc(db, 'users', req.params.id)
             const docSnap = await getDoc(docRef)
-            
+
             if(!docSnap.exists()){
                 res.status(404).json({status: 'Failed', message: 'User not found'})
                 return
@@ -73,6 +92,66 @@ class UserController{
             res.status(200).json({status: 'Success', message: 'User deleted'})
         }catch(e){
             res.status(500).json({status: 'Failure', message: 'Failed to delete user', error: e instanceof Error ? e.message : e})
+        }
+    }
+
+    async updateUserById(req, res){
+        const updatedFields = {
+            isOnline: req.body.isOnline,
+            username: req.body.username
+        }
+        const docRef = doc(db, 'users', req.params.id)
+        try{
+            const docSnap = await getDoc(docRef)
+            if(!docSnap.exists()){
+                res.status(404).json({status: 'Failed', message: 'User not found'})
+                return
+            }
+            await updateDoc(docRef, {
+                isOnline: updatedFields.isOnline,
+                username: updatedFields.username || docSnap.data().username
+            })
+            res.status(200).json({status: 'Success', message: 'User updated'})
+        }catch(e){
+            res.status(500).json({status: 'Failure', message: 'Failed to update user', error: e instanceof Error ? e.message : e})
+        }
+    }
+
+    async openTabById(req, res){
+        const docRef = doc(db, 'users', req.params.id)
+        try{
+            const docSnap = await getDoc(docRef)
+            if(!docSnap.exists()){
+                res.status(404).json({status: 'Failed', message: 'User not found'})
+                return
+            }
+            const tabsOpened = docSnap.data().tabsOpened + 1
+            await updateDoc(docRef, {
+                tabsOpened,
+                isOnline: tabsOpened > 0
+            })
+            res.status(200).json({status: 'Success', message: 'User updated'})
+        }catch(e){
+            res.status(500).json({status: 'Failure', message: 'Failed to update user', error: e instanceof Error ? e.message : e})
+        }
+    }
+
+    async closeTabById(req, res){
+        const docRef = doc(db, 'users', req.params.id)
+        try{
+            const docSnap = await getDoc(docRef)
+            if(!docSnap.exists()){
+                res.status(404).json({status: 'Failed', message: 'User not found'})
+                return
+            }
+            const tabsOpened = docSnap.data().tabsOpened - 1
+            await updateDoc(docRef, {
+                tabsOpened,
+                isOnline: tabsOpened > 0
+            })
+            res.status(200).json({status: 'Success', message: 'User updated'})
+        }catch(e){
+            res.status(500).json({status: 'Failure', message: 'Failed to update user', error: e instanceof Error ? e.message : e})
         }
     }
 }

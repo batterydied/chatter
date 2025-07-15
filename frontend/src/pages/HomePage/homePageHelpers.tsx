@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { db } from '../../config/firebase'
 import { collection, where, query, onSnapshot, doc, getDoc, orderBy } from 'firebase/firestore'
+import { useEffect } from 'react'
 
 export type AppUser = {
     id: string,
@@ -113,3 +114,48 @@ export const renderConversations = (
     });
 };
 
+export const useTabCloseStatus = (userId: string | undefined) => {
+  useEffect(() => {
+    if(!userId) return
+
+    const handleUnload = () => {
+        if(sessionStorage.getItem('tabCounted')){
+            return
+        }
+        navigator.sendBeacon(`${import.meta.env.VITE_BACKEND_API_URL}/user/${userId}/closeTab`)
+    }
+
+    openTab(userId)
+    
+    window.addEventListener('beforeunload', handleUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload)
+    }
+    
+  }, [userId])
+}
+
+
+export const openTab = async (userId: string)=>{
+    if(sessionStorage.getItem('tabCounted')){
+        return
+    }
+    sessionStorage.setItem('tabCounted', 'true')
+    try{
+        await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/user/${userId}/openTab`)
+    }catch(e){
+        console.log(`Error: ${e}`)
+    }
+}
+
+export const closeTab = async (userId: string)=>{
+    if(sessionStorage.getItem('tabCounted')){
+        return
+    }
+    try{
+        await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/user/${userId}/closeTab`)
+    }catch(e){
+        console.log(`Error: ${e}`)
+    }
+}

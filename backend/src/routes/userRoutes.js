@@ -3,11 +3,19 @@ import UserController from '../controllers/userControllers.js'
 
 const router = express.Router()
 
+router.post('/:id/openTab', UserController.openTabById)
+
+router.post('/:id/closeTab', UserController.closeTabById)
+
+router.post('/:id', UserController.updateUserById)
+
+
 router.post('/', UserController.createUser)
 
-router.get('/:id', UserController.retrieveUserById)
+router.get('/:email', UserController.retrieveUserByEmail)
 
 router.delete('/:id', UserController.deleteUserById)
+
 
 export default router
 
