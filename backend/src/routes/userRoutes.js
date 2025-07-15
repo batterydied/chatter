@@ -5,9 +5,9 @@ const router = express.Router()
 
 router.post('/', UserController.createUser)
 
-router.get('/:email', UserController.retrieveUserByEmail)
+router.get('/:id', UserController.retrieveUserById)
 
-router.delete('/:email', UserController.deleteUserByEmail)
+router.delete('/:id', UserController.deleteUserById)
 
 export default router
 
