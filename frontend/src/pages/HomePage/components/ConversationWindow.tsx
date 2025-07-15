@@ -78,6 +78,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       setMessages(serialized)
 
       setShouldScrollToBottom(true)
+      console.log('activated')
       setLoading(false)
 
       return(serialized)
@@ -151,7 +152,10 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         // Check scroll position before updating messages
         const container = scrollContainerRef.current;
         const nearBottom = isUserNearBottom(container);
-        setShouldScrollToBottom(nearBottom);
+
+        if(nearBottom){
+          setShouldScrollToBottom(true);
+        }
         
         return [...prev, newMessage];
       });
@@ -162,14 +166,9 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
   useEffect(() => {
     if (shouldScrollToBottom && messages.length > 0) {
-      const timer = setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 0);
-      
-      return () => clearTimeout(timer);
+        bottomRef.current?.scrollIntoView({ behavior: 'auto' });
     }
   }, [shouldScrollToBottom, messages]);
-
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current
