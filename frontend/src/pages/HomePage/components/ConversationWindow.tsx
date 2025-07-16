@@ -3,6 +3,7 @@ import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import type { Firestore, Timestamp } from 'firebase/firestore';
+import useAutoScroll from '../../../hooks/useAutoScroll'
 
 type ConversationWindowProps = {
   conversationId: string,
@@ -30,13 +31,13 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loading, setLoading] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true)
+
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
   const [earliestMessageId, setEarliestMessageId] = useState<string | null>(null)
+
+  const { scrollContainerRef, setShouldScrollToBottom, isUserNearBottom, bottomRef } = useAutoScroll(messages)
 
   const serializeMessages = async (rawMessages: RawMessage[], db: Firestore) => {
     return await Promise.all(
@@ -78,7 +79,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       setMessages(serialized)
 
       setShouldScrollToBottom(true)
-      console.log('activated')
+
       setLoading(false)
 
       return(serialized)
@@ -91,13 +92,14 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       }
       return []
     }
-  }, [conversationId])
+  }, [conversationId, setShouldScrollToBottom])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if(inputMessage){
       console.log(inputMessage)
       uploadMessage(conversationId, userId, inputMessage)
+      setShouldScrollToBottom(true)
       setInputMessage('')
     }
   }
@@ -114,12 +116,6 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   useEffect(()=>{
     inputRef.current?.focus()
   }, [conversationId])
-
-  const isUserNearBottom = useCallback((container: HTMLDivElement | null, threshold = 100): boolean => {
-    if (!container) return false;
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    return scrollHeight - (scrollTop + clientHeight) <= threshold;
-  }, []);
 
   useEffect(() => {
     const queryRef = query(
@@ -162,13 +158,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     });
     
     return unsub;
-  }, [conversationId, isUserNearBottom]);
-
-  useEffect(() => {
-    if (shouldScrollToBottom && messages.length > 0) {
-        bottomRef.current?.scrollIntoView({ behavior: 'auto' });
-    }
-  }, [shouldScrollToBottom, messages]);
+  }, [conversationId, isUserNearBottom, scrollContainerRef, setShouldScrollToBottom]);
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current
@@ -227,7 +217,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
     scrollContainer.addEventListener('scroll', handleScroll)
     return () => scrollContainer.removeEventListener('scroll', handleScroll)
-  }, [earliestMessageId, hasMore, loadingMore, conversationId])
+  }, [earliestMessageId, hasMore, loadingMore, conversationId, scrollContainerRef, setShouldScrollToBottom])
 
 
   if(!messages){
