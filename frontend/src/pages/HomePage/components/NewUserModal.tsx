@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { createUser, type AppUser } from '../homePageHelpers'
+import type { User } from 'firebase/auth'
+
 type NewUserModalProps = {
+    user: User,
     setIsNewUser: (state: boolean) => void,
     setAppUser: (appUser: AppUser) => void
     email: string
 
 }
-const NewUserModal = ({setIsNewUser, email, setAppUser}: NewUserModalProps) => {
+const NewUserModal = ({user, setIsNewUser, email, setAppUser}: NewUserModalProps) => {
     const [username, setUsername] = useState<string>('')
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -14,7 +17,7 @@ const NewUserModal = ({setIsNewUser, email, setAppUser}: NewUserModalProps) => {
     }
 
     const handleSubmit = async () => {
-        await createUser(email, username, setAppUser)
+        await createUser(user.uid, email, username, setAppUser)
         setIsNewUser(false)
     }
 

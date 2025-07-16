@@ -35,12 +35,14 @@ export const fetchUserFromDB = async (
     }
 }
 
-export const createUser = async (email: string, username: string, setAppUser: (user: AppUser)=>void) => {
+export const createUser = async (uid: string, email: string, username: string, setAppUser: (user: AppUser)=>void) => {
     try{
         const fields = {
+            uid,
             email,
-            name: username
+            username
         }
+        console.log(fields)
         const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/user`, fields)
         setAppUser(res.data.user)
     }catch(e){

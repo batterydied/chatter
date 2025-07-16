@@ -6,6 +6,7 @@ import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
+import usePresence from '../../hooks/usePresence'
 
 type HomeProps = {
     user: User | null
@@ -20,6 +21,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [loading, setLoading] = useState(true)
     const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
     const navigate = useNavigate();
+    usePresence()
 
     useEffect(()=>{
         if(!user) {
@@ -32,7 +34,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
             }
             checkUser(user.email)
         }
-    }, [user])
+    }, [user, navigate])
 
     useEffect(()=>{
         if(appUser){
@@ -53,7 +55,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
         <div className='w-full h-full flex justify-center items-center'>
             {user && user.email ? (
                 isNewUser ? (
-                    <NewUserModal setIsNewUser={setIsNewUser} email={user.email} setAppUser={setAppUser}/>
+                    <NewUserModal setIsNewUser={setIsNewUser} email={user.email} setAppUser={setAppUser} user={user}/>
                 ) : (
                     <div className='flex flex-row w-full h-full'>
                         <div className='min-w-[360px]'>
@@ -71,7 +73,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                         </div>
                                     </div>
                                     <div className='pl-2'>
-                                        <p className='text-sm'>{appUser?.username}</p>
+                                        <p className='text-sm text-left'>{appUser?.username}</p>
                                         <p className='text-neutral-content'>status</p>
                                     </div>
                                 </div>

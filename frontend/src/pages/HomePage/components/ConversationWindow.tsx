@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
@@ -30,7 +30,6 @@ type SerializedMessage = {
 const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loading, setLoading] = useState(true)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -38,6 +37,12 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [earliestMessageId, setEarliestMessageId] = useState<string | null>(null)
 
   const { scrollContainerRef, setShouldScrollToBottom, isUserNearBottom, bottomRef } = useAutoScroll(messages)
+
+  const inputRef = useCallback((ele: HTMLInputElement | null) => {
+    if (ele) {
+      ele.focus();
+    }
+  }, []);
 
   const serializeMessages = async (rawMessages: RawMessage[], db: Firestore) => {
     return await Promise.all(
@@ -75,8 +80,10 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       setHasMore(!res.data.noMore)
 
       const serialized = await serializeMessages(rawMessages, db)
-      setEarliestMessageId(serialized[0].id)
-      setMessages(serialized)
+      if(serialized.length > 0) {
+        setEarliestMessageId(serialized[0].id);
+        setMessages(serialized);
+      }
 
       setShouldScrollToBottom(true)
 
@@ -111,11 +118,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       await fetchMessages(15, null)
     }
     init()
-}, [fetchMessages])
-
-  useEffect(()=>{
-    inputRef.current?.focus()
-  }, [conversationId])
+  }, [fetchMessages])
 
   useEffect(() => {
     const queryRef = query(
@@ -242,7 +245,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         <div ref={bottomRef}></div>
       </div>
       <form onSubmit={handleSubmit}>
-        <input value={inputMessage} onChange={(e)=>setInputMessage(e.target.value)} type="text" className="input input-md items-end w-full focus:outline-0 mt-2" ref={inputRef}/>
+        <input placeholder={'Type a message...'} value={inputMessage} onChange={(e)=>setInputMessage(e.target.value)} type="text" className="input input-md items-end w-full focus:outline-0 mt-2" ref={inputRef}/>
       </form>
     </div>
   )

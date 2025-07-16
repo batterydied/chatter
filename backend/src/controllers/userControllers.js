@@ -5,10 +5,10 @@ import { collection, addDoc, getDocs, getDoc, query, where, deleteDoc, serverTim
 class UserController{
     async createUser(req, res){
         const user = {
-            username: req.body.name,
+            username: req.body.username,
+            uid: req.body.uid,
             email: req.body.email,
             createdAt: serverTimestamp(),
-            isOnline: true,
         }
         try{
             UserSchema.parse(user);
