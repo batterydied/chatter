@@ -1,5 +1,5 @@
 import type { User } from 'firebase/auth'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { fetchUserFromDB, subscribeConversation, renderConversations } from './homePageHelpers'
 import type { AppUser, Conversation } from './homePageHelpers'
@@ -19,9 +19,14 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [recentConversations, setRecentConversations] = useState<Conversation[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
+    const navigate = useNavigate();
 
     useEffect(()=>{
-        if(user && user.email){
+        if(!user) {
+            navigate("/", { replace: true });
+            return;
+        }
+        if(user.email){
             const checkUser = async (email: string) => {
                 await fetchUserFromDB(email, setIsNewUser, setAppUser, setLoading)
             }
