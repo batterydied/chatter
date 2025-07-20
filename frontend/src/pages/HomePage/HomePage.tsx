@@ -6,7 +6,6 @@ import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
-import usePresence from '../../hooks/usePresence'
 
 type HomeProps = {
     user: User | null
@@ -21,7 +20,6 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [loading, setLoading] = useState(true)
     const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
     const navigate = useNavigate();
-    usePresence()
 
     useEffect(()=>{
         if(!user) {

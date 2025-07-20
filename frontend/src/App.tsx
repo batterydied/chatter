@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { auth } from './config/firebase'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import type { User } from 'firebase/auth'
+import usePresence from './hooks/usePresence'
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -37,6 +38,8 @@ function App() {
       });
       return unsubscribe
   }, [])
+  
+  usePresence(user);
 
   const logOut = async () => {
     await signOut(auth);

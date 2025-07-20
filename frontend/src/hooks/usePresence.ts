@@ -1,19 +1,23 @@
-import { getDatabase, ref, onValue, onDisconnect, set, serverTimestamp } from "firebase/database";
-import { getAuth } from "firebase/auth";
+import { ref, onValue, onDisconnect, set, serverTimestamp } from "firebase/database";
 import { useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
+import type { User } from 'firebase/auth'
+import { rtdb } from "../config/firebase";
 
-const usePresence = ()=>{
-  const auth = getAuth();
-  const db = getDatabase();
+const usePresence = (user: User | null)=>{
 
   useEffect(() => {
-    const user = auth.currentUser;
     if (!user) return;
 
     const userId = user.uid;
-    const sessionId = uuidv4(); // unique per tab/session
-    const userStatusRef = ref(db, `status/${userId}/${sessionId}`);
+
+    let sessionId = sessionStorage.getItem('firebaseSessionId');
+    if (!sessionId) {
+      sessionId = uuidv4();
+      sessionStorage.setItem('firebaseSessionId', sessionId);
+    }
+
+    const userStatusRef = ref(rtdb, `status/${userId}/${sessionId}`);
 
     const isOffline = {
       state: 'offline',
@@ -25,7 +29,7 @@ const usePresence = ()=>{
       last_changed: serverTimestamp(),
     };
 
-    const connectedRef = ref(db, '.info/connected');
+    const connectedRef = ref(rtdb, '.info/connected');
 
     const unsubscribe = onValue(connectedRef, (snapshot) => {
         if (snapshot.val() === false) {
@@ -33,10 +37,7 @@ const usePresence = ()=>{
             return;
         }
 
-        onDisconnect(userStatusRef).set({
-            state: 'offline',
-            last_changed: serverTimestamp(),
-        });
+        onDisconnect(userStatusRef).set(isOffline).catch(console.error)
 
         set(userStatusRef, isOnline).catch(console.error);
     });
@@ -46,7 +47,7 @@ const usePresence = ()=>{
         unsubscribe();
         set(userStatusRef, isOffline).catch(console.error);
     };
-  }, [auth, db]);
+  }, [user, rtdb]);
 }
 
 export default usePresence
