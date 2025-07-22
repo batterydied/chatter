@@ -111,6 +111,40 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     }
   }
 
+  const handleMessageClick = (userId: string, msg: SerializedMessage) => {
+    if(userId == msg.senderId){
+      console.log('works')
+    }
+  }
+
+  const renderMessages = (messages: SerializedMessage[], userId: string) => {
+    if(messages.length != 0){
+      return messages.map((msg, i) => {
+        const prev = messages[i - 1];
+        const isGrouped =
+          prev &&
+          prev.senderId === msg.senderId &&
+          Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000;
+
+        return (
+          <div className={`chat ${userId === msg.senderId ? 'chat-end' : 'chat-start'}`} key={msg.id} onClick={()=>handleMessageClick(userId, msg)}>
+            {!isGrouped && (
+              <div className="chat-header">
+                {msg.username}
+                <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
+              </div>
+            )}
+            <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>{msg.text}</div>
+          </div>
+        )
+      })
+    }else{
+      return (
+        <div>
+          <span>This is the beginning of your direct message history!</span> 
+        </div>)
+    } 
+  }
   useEffect(() => {
     const init = async () => {
       setLoading(true)
@@ -291,35 +325,6 @@ const uploadMessage = async (conversationId: string, userId: string, inputMessag
       console.log('Unknown error occurred')
     }
   }
-}
-
-const renderMessages = (messages: SerializedMessage[], userId: string) => {
-  if(messages.length != 0){
-    return messages.map((msg, i) => {
-      const prev = messages[i - 1];
-      const isGrouped =
-        prev &&
-        prev.senderId === msg.senderId &&
-        Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000;
-
-      return (
-        <div className={`chat ${userId === msg.senderId ? 'chat-end' : 'chat-start'}`} key={msg.id}>
-          {!isGrouped && (
-            <div className="chat-header">
-              {msg.username}
-              <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-            </div>
-          )}
-          <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>{msg.text}</div>
-        </div>
-      )
-    })
-  }else{
-    return (
-      <div>
-        <span>This is the beginning of your direct message history!</span> 
-      </div>)
-  } 
 }
 
 
