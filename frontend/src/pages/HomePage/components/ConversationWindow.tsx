@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
-import type { Firestore, Timestamp } from 'firebase/firestore';
+import type { Firestore, Timestamp } from 'firebase/firestore'
 import useAutoScroll from '../../../hooks/useAutoScroll'
+import { EditIcon, ReactIcon, ReplyIcon, DeleteIcon } from '../../../assets/icons'
 
 type ConversationWindowProps = {
   conversationId: string,
@@ -30,11 +31,13 @@ type SerializedMessage = {
 const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loading, setLoading] = useState(true)
-  const [hoverMessageId, setHoverMessageId] = useState<string | null>(null)
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
   const [earliestMessageId, setEarliestMessageId] = useState<string | null>(null)
+  const [hoveredIcon, setHoveredIcon] = useState<string | null>(null)
+  const [deleteMessage, setDeleteMessage] = useState<SerializedMessage | null>(null)
 
   const { scrollContainerRef, setShouldScrollToBottom, isUserNearBottom, bottomRef } = useAutoScroll(messages)
 
@@ -102,11 +105,11 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   }, [conversationId, setShouldScrollToBottom])
 
   const handleSelectHoverId = (msgId: string)=>{
-    setHoverMessageId(msgId)
+    setHoveredMessageId(msgId)
   }
 
   const handleRemoveHoverId = () => {
-    setHoverMessageId(null)
+    setHoveredMessageId(null)
   }
   
   const handleSubmit = (e: React.FormEvent) => {
@@ -119,6 +122,11 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     }
   }
 
+  const handleDeleteConfirmation = (msg: SerializedMessage) => {
+    setDeleteMessage(msg);
+    (document.getElementById('delete_confirmation_modal') as HTMLDialogElement)!.showModal();
+  }
+
   const renderMessages = (messages: SerializedMessage[], userId: string) => {
     if(messages.length != 0){
       return messages.map((msg, i) => {
@@ -127,7 +135,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
           prev &&
           prev.senderId === msg.senderId &&
           Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000;
-        const isHovered = hoverMessageId === msg.id;
+        const isHovered = hoveredMessageId === msg.id;
 
         return (
   <div
@@ -152,9 +160,12 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     
     {isHovered && (
       <div
-        className="absolute right-4 -top-2 p-1 bg-base-200 outline-1"
+        className="absolute right-4 -top-2 p-2 bg-base-200 outline-1 outline-base-100 rounded-md flex items-center"
       >
-        <span>placeholder</span>
+        <button onMouseEnter={()=>setHoveredIcon('react')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReactIcon iconColor='#fff'/></button>
+        <button onMouseEnter={()=>setHoveredIcon('edit')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><EditIcon iconColor='#fff'/></button>
+        <button onMouseEnter={()=>setHoveredIcon('reply')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReplyIcon iconColor='#fff'/></button>
+        {userId == msg.senderId && <button onClick={()=>handleDeleteConfirmation(msg)} onMouseEnter={()=>setHoveredIcon('delete')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'} rounded-md p-1`}><DeleteIcon iconColor='#D0021B'/></button>}
       </div>
     )}
   </div>
@@ -304,6 +315,28 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       <form onSubmit={handleSubmit}>
         <input placeholder={'Type a message...'} value={inputMessage} onChange={(e)=>setInputMessage(e.target.value)} type="text" className="input input-md items-end w-full focus:outline-0 mt-2" ref={inputRef}/>
       </form>
+      <dialog id="delete_confirmation_modal" className="modal">
+        <div className="modal-box">
+          <form method="dialog">
+            {/* if there is a button in form, it will close the modal */}
+            <div className='absolute bottom-2 right-4'>
+              <button className="btn btn-sm bg-gray-500 mr-2 hover:!border-gray-500 hover:bg-gray-600" onClick={()=>setDeleteMessage(null)}>Cancel</button>
+              <button className="btn btn-sm bg-red-500 hover:!border-red-500 hover:bg-red-600">Delete</button>
+            </div>
+          </form>
+          <h3 className="font-bold text-lg">Delete Message</h3>
+          <h3 className="text-md">Are you sure you want to delete this message?</h3>
+          <div className='chat chat-end bg-base-300 p-2 m-6 rounded-md'>
+              <div className="chat-header">
+                {deleteMessage?.username}
+                <time className="text-xs opacity-50 ml-2">{deleteMessage?.messageTime}</time>
+              </div>
+              <div className={`chat-bubble mt-3`}>
+                {deleteMessage?.text}
+              </div>
+          </div>
+        </div>
+      </dialog>
     </div>
   )
 }
