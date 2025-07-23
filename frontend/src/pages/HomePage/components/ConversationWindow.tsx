@@ -30,7 +30,7 @@ type SerializedMessage = {
 const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loading, setLoading] = useState(true)
-
+  const [hoverMessageId, setHoverMessageId] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
@@ -101,6 +101,14 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     }
   }, [conversationId, setShouldScrollToBottom])
 
+  const handleSelectHoverId = (msgId: string)=>{
+    setHoverMessageId(msgId)
+  }
+
+  const handleRemoveHoverId = () => {
+    setHoverMessageId(null)
+  }
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if(inputMessage){
@@ -108,12 +116,6 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       uploadMessage(conversationId, userId, inputMessage)
       setShouldScrollToBottom(true)
       setInputMessage('')
-    }
-  }
-
-  const handleMessageClick = (userId: string, msg: SerializedMessage) => {
-    if(userId == msg.senderId){
-      console.log('works')
     }
   }
 
@@ -125,18 +127,39 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
           prev &&
           prev.senderId === msg.senderId &&
           Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000;
+        const isHovered = hoverMessageId === msg.id;
 
         return (
-          <div className={`chat ${userId === msg.senderId ? 'chat-end' : 'chat-start'}`} key={msg.id} onClick={()=>handleMessageClick(userId, msg)}>
-            {!isGrouped && (
-              <div className="chat-header">
-                {msg.username}
-                <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-              </div>
-            )}
-            <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>{msg.text}</div>
-          </div>
-        )
+  <div
+    className="relative"
+    onMouseLeave={handleRemoveHoverId}
+    onMouseEnter={() => handleSelectHoverId(msg.id)}
+  >
+    {/* Actual chat message */}
+    <div
+      className={`chat chat-start ${isHovered && 'bg-base-200'} relative`}
+    >
+      {!isGrouped && (
+        <div className="chat-header">
+          {msg.username}
+          <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
+        </div>
+      )}
+      <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+        {msg.text}
+      </div>
+    </div>
+    
+    {isHovered && (
+      <div
+        className="absolute right-4 -top-2 p-1 bg-base-200 outline-1"
+      >
+        <span>placeholder</span>
+      </div>
+    )}
+  </div>
+)
+
       })
     }else{
       return (
@@ -275,7 +298,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     <div className='h-full w-full flex flex-col'>
       <div className='flex-1 overflow-y-auto' ref={scrollContainerRef}>
         {loadingMore && <span className="loading loading-dots loading-md"></span>}
-        {renderMessages(messages, userId)}
+        <div className='mt-3'>{renderMessages(messages, userId)}</div>
         <div ref={bottomRef}></div>
       </div>
       <form onSubmit={handleSubmit}>
