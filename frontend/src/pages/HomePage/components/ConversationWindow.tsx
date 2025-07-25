@@ -18,6 +18,7 @@ type RawMessage = {
   senderId: string
   text: string
   type: string
+  isEdited: boolean
 }
 
 type SerializedMessage = {
@@ -26,7 +27,8 @@ type SerializedMessage = {
   username: string
   messageTime: string,
   senderId: string,
-  timestamp: Date
+  timestamp: Date,
+  isEdited: boolean
 }
 
 const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps) => {
@@ -40,7 +42,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<SerializedMessage | null>(null)
   const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([])
-
+  const [editMessage, setEditMessage] = useState<SerializedMessage | null>(null)
+  const [editMessageInputMessage, setEditMessageInputMessage] = useState('')
 
   const { scrollContainerRef, setShouldScrollToBottom, isUserNearBottom, bottomRef } = useAutoScroll(messages)
 
@@ -68,7 +71,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
           username,
           messageTime,
           senderId: m.senderId,
-          timestamp
+          timestamp,
+          isEdited: m.isEdited
         };
       })
     );
@@ -129,15 +133,70 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     (document.getElementById('delete_confirmation_modal') as HTMLDialogElement)!.showModal();
   }
 
-  const handleDelete = async (msgId: string) => {
+  const sendDelete = async (msgId: string) => {
     try{
       await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/${msgId}`)
       setDeletedMessageIds((prev) => [...prev, msgId])
-      toast.success('Message deleted.')
     }catch{
       toast.error('Could not delete message, try again later.')
     }
   }
+
+  const handleEdit = (msg: SerializedMessage) => {
+    setEditMessage(msg)
+    setEditMessageInputMessage(msg.text)
+  }
+  
+  const cancelEdit = () => {
+    setEditMessage(null);
+  };
+
+
+  const handleUpdate = useCallback((msg: SerializedMessage, updatedMsg: string) => {
+    const sendUpdate = async (msgId: string, updatedMsg: string) => {
+      try{
+        await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/${msgId}`, 
+          {
+            type: 'text',
+            text: updatedMsg
+          })
+        setMessages((prevMessages) =>
+          prevMessages.map((m) =>
+            m.id === msg.id ? { ...m, text: updatedMsg, isEdited: true } : m
+          )
+        );
+      }catch{
+        toast.error('Could not edit message, try again later.')
+      }
+    }
+    if(updatedMsg === ''){
+      handleDeleteConfirmation(msg)
+    }
+    else if(msg.text !== updatedMsg){
+      sendUpdate(msg.id, updatedMsg)
+    }
+    setEditMessage(null)
+  }, [conversationId])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        cancelEdit();
+      }
+      if(e.key === 'Enter'){
+        handleUpdate(editMessage!, editMessageInputMessage)
+      }
+    };
+
+    if (editMessage) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [editMessage, editMessageInputMessage, handleUpdate]);
+
 
   const renderMessages = (messages: SerializedMessage[], userId: string) => {
     if(messages.length != 0){
@@ -148,7 +207,9 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
           prev &&
           prev.senderId === msg.senderId &&
           Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000;
-        const isHovered = hoveredMessageId === msg.id;
+        const isHovered = hoveredMessageId === msg.id
+        const isUser = userId === msg.senderId
+        const isEditingMessage = editMessage?.id === msg.id
 
         return (
           <div
@@ -158,25 +219,40 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
             onMouseEnter={() => handleSelectHoverId(msg.id)}
           >
             <div
-              className={`chat chat-start ${isHovered && 'bg-base-200'} relative`}
+              className={`chat ${isUser ? 'chat-end' : 'chat-start'} ${isHovered && 'bg-base-200'} relative`}
             >
+              <div className="chat-image avatar">
+                <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
+                  <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
+                </div>
+              </div>
               {!isGrouped && (
                 <div className="chat-header">
-                  {msg.username}
+                  <p>{msg.username}</p>
                   <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
                 </div>
               )}
               <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-                {msg.text}
+                {isEditingMessage ? 
+                <div>
+                  <input ref={inputRef} onChange={(e) => setEditMessageInputMessage(e.target.value)} className='w-full focus:outline-none' value={editMessageInputMessage}/>
+                  <p className='text-sm'>Escape to <span className='text-accent'>cancel</span>, enter to <span className='text-accent'>save</span></p>
+                </div> 
+                : 
+                <div>
+                  {msg.text}
+                  {msg.isEdited && <span className={`absolute bottom-0 ${isUser ? 'right-full' : 'left-full'} px-2 text-xs text-gray-300`}>(edited)</span>}
+                </div>
+                }
               </div>
             </div>
             
             {isHovered && (
               <div
-                className="absolute right-4 -top-2 p-2 bg-base-200 outline-1 outline-base-100 rounded-md flex items-center"
+                className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center"
               >
                 <button onMouseEnter={()=>setHoveredIcon('react')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReactIcon iconColor='#fff'/></button>
-                <button onMouseEnter={()=>setHoveredIcon('edit')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><EditIcon iconColor='#fff'/></button>
+                {userId == msg.senderId && <button onClick={()=>handleEdit(msg)} onMouseEnter={()=>setHoveredIcon('edit')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><EditIcon iconColor='#fff'/></button>}
                 <button onMouseEnter={()=>setHoveredIcon('reply')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReplyIcon iconColor='#fff'/></button>
                 {userId == msg.senderId && <button onClick={()=>handleDeleteConfirmation(msg)} onMouseEnter={()=>setHoveredIcon('delete')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'} rounded-md p-1`}><DeleteIcon iconColor='#D0021B'/></button>}
               </div>
@@ -215,7 +291,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
           createdAt: data.createdAt,
           senderId: data.senderId,
           text: data.text,
-          type: data.type
+          type: data.type,
+          isEdited: data.isEdited
         };
       });
 
@@ -333,18 +410,19 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
             {/* if there is a button in form, it will close the modal */}
             <div className='absolute bottom-2 right-4'>
               <button className="btn btn-sm bg-gray-500 mr-2 hover:!border-gray-500 hover:bg-gray-600" onClick={()=>setDeleteMessage(null)}>Cancel</button>
-              <button className="btn btn-sm bg-red-500 hover:!border-red-500 hover:bg-red-600" onClick={()=>handleDelete(deleteMessage!.id)}>Delete</button>
+              <button className="btn btn-sm bg-red-500 hover:!border-red-500 hover:bg-red-600" onClick={()=>sendDelete(deleteMessage!.id)}>Delete</button>
             </div>
           </form>
           <h3 className="font-bold text-lg">Delete Message</h3>
           <h3 className="text-md">Are you sure you want to delete this message?</h3>
-          <div className='chat chat-end bg-base-300 p-2 m-6 rounded-md'>
+          <div className='chat chat-end bg-base-100 p-2 m-6 rounded-md'>
               <div className="chat-header">
                 {deleteMessage?.username}
                 <time className="text-xs opacity-50 ml-2">{deleteMessage?.messageTime}</time>
               </div>
               <div className={`chat-bubble mt-3`}>
                 {deleteMessage?.text}
+                {deleteMessage?.isEdited && <span className='absolute bottom-0 right-full px-2 text-xs text-gray-300'>(edited)</span>}
               </div>
           </div>
         </div>

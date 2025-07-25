@@ -58,7 +58,8 @@ class MessageController{
                 fileUrl,
                 fileName,
                 fileSize,
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp(),
+                isEdited: false
             }
 
             MessageSchema.parse(rawMessage)
@@ -98,7 +99,8 @@ class MessageController{
         try{
             const updatedFields = {
                 text,
-                updatedAt: serverTimestamp()
+                updatedAt: serverTimestamp(),
+                isEdited: true
             }
 
             await updateDoc(docRef, updatedFields)

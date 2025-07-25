@@ -8,7 +8,8 @@ const MessageSchema = z.object({
     fileName: z.string().optional(),
     fileSize: z.number().optional(),
     createdAt: z.any(),
-    updatedAt: z.any().optional()
+    updatedAt: z.any().optional(),
+    isEdited: z.boolean()
 });
 
 export default MessageSchema
