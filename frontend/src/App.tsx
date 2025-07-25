@@ -7,6 +7,7 @@ import { auth } from './config/firebase'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import type { User } from 'firebase/auth'
 import usePresence from './hooks/usePresence'
+import { Toaster } from 'sonner'
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -48,6 +49,7 @@ function App() {
 
   return (
     <>
+      <Toaster richColors position="top-right" />
       <BrowserRouter>
         <Routes>
           <Route path='/' element={<AuthPage user={user} logIn={logIn}/>} />

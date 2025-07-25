@@ -4,9 +4,9 @@ const router = express.Router({mergeParams: true})
 
 router.get('/', MessageController.getAllMessages)
 router.get('/page', MessageController.getMessagesByPagination)
-router.get('/:messageID', MessageController.getMessage)
+router.get('/:messageId', MessageController.getMessage)
 router.post('/', MessageController.createMessage);
-router.put('/:messageID', MessageController.editMessage)
-router.delete('/:messageID', MessageController.deleteMessage)
+router.put('/:messageId', MessageController.editMessage)
+router.delete('/:messageId', MessageController.deleteMessage)
 router.delete('/', MessageController.deleteAllMessages)
 export default router

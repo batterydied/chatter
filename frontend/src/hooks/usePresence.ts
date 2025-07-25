@@ -47,7 +47,7 @@ const usePresence = (user: User | null)=>{
         unsubscribe();
         set(userStatusRef, isOffline).catch(console.error);
     };
-  }, [user, rtdb]);
+  }, [user]);
 }
 
 export default usePresence

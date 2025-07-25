@@ -5,6 +5,7 @@ import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'fire
 import type { Firestore, Timestamp } from 'firebase/firestore'
 import useAutoScroll from '../../../hooks/useAutoScroll'
 import { EditIcon, ReactIcon, ReplyIcon, DeleteIcon } from '../../../assets/icons'
+import { toast } from 'sonner'
 
 type ConversationWindowProps = {
   conversationId: string,
@@ -38,6 +39,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [earliestMessageId, setEarliestMessageId] = useState<string | null>(null)
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<SerializedMessage | null>(null)
+  const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([])
+
 
   const { scrollContainerRef, setShouldScrollToBottom, isUserNearBottom, bottomRef } = useAutoScroll(messages)
 
@@ -115,7 +118,6 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if(inputMessage){
-      console.log(inputMessage)
       uploadMessage(conversationId, userId, inputMessage)
       setShouldScrollToBottom(true)
       setInputMessage('')
@@ -127,9 +129,20 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     (document.getElementById('delete_confirmation_modal') as HTMLDialogElement)!.showModal();
   }
 
+  const handleDelete = async (msgId: string) => {
+    try{
+      await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/${msgId}`)
+      setDeletedMessageIds((prev) => [...prev, msgId])
+      toast.success('Message deleted.')
+    }catch{
+      toast.error('Could not delete message, try again later.')
+    }
+  }
+
   const renderMessages = (messages: SerializedMessage[], userId: string) => {
     if(messages.length != 0){
       return messages.map((msg, i) => {
+        if (deletedMessageIds.includes(msg.id)) return null;
         const prev = messages[i - 1];
         const isGrouped =
           prev &&
@@ -138,39 +151,38 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         const isHovered = hoveredMessageId === msg.id;
 
         return (
-  <div
-    className="relative"
-    onMouseLeave={handleRemoveHoverId}
-    onMouseEnter={() => handleSelectHoverId(msg.id)}
-  >
-    {/* Actual chat message */}
-    <div
-      className={`chat chat-start ${isHovered && 'bg-base-200'} relative`}
-    >
-      {!isGrouped && (
-        <div className="chat-header">
-          {msg.username}
-          <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-        </div>
-      )}
-      <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-        {msg.text}
-      </div>
-    </div>
-    
-    {isHovered && (
-      <div
-        className="absolute right-4 -top-2 p-2 bg-base-200 outline-1 outline-base-100 rounded-md flex items-center"
-      >
-        <button onMouseEnter={()=>setHoveredIcon('react')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReactIcon iconColor='#fff'/></button>
-        <button onMouseEnter={()=>setHoveredIcon('edit')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><EditIcon iconColor='#fff'/></button>
-        <button onMouseEnter={()=>setHoveredIcon('reply')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReplyIcon iconColor='#fff'/></button>
-        {userId == msg.senderId && <button onClick={()=>handleDeleteConfirmation(msg)} onMouseEnter={()=>setHoveredIcon('delete')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'} rounded-md p-1`}><DeleteIcon iconColor='#D0021B'/></button>}
-      </div>
-    )}
-  </div>
-)
-
+          <div
+            key={msg.id}
+            className="relative"
+            onMouseLeave={handleRemoveHoverId}
+            onMouseEnter={() => handleSelectHoverId(msg.id)}
+          >
+            <div
+              className={`chat chat-start ${isHovered && 'bg-base-200'} relative`}
+            >
+              {!isGrouped && (
+                <div className="chat-header">
+                  {msg.username}
+                  <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
+                </div>
+              )}
+              <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+                {msg.text}
+              </div>
+            </div>
+            
+            {isHovered && (
+              <div
+                className="absolute right-4 -top-2 p-2 bg-base-200 outline-1 outline-base-100 rounded-md flex items-center"
+              >
+                <button onMouseEnter={()=>setHoveredIcon('react')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReactIcon iconColor='#fff'/></button>
+                <button onMouseEnter={()=>setHoveredIcon('edit')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><EditIcon iconColor='#fff'/></button>
+                <button onMouseEnter={()=>setHoveredIcon('reply')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReplyIcon iconColor='#fff'/></button>
+                {userId == msg.senderId && <button onClick={()=>handleDeleteConfirmation(msg)} onMouseEnter={()=>setHoveredIcon('delete')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'} rounded-md p-1`}><DeleteIcon iconColor='#D0021B'/></button>}
+              </div>
+            )}
+          </div>
+        )
       })
     }else{
       return (
@@ -321,7 +333,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
             {/* if there is a button in form, it will close the modal */}
             <div className='absolute bottom-2 right-4'>
               <button className="btn btn-sm bg-gray-500 mr-2 hover:!border-gray-500 hover:bg-gray-600" onClick={()=>setDeleteMessage(null)}>Cancel</button>
-              <button className="btn btn-sm bg-red-500 hover:!border-red-500 hover:bg-red-600">Delete</button>
+              <button className="btn btn-sm bg-red-500 hover:!border-red-500 hover:bg-red-600" onClick={()=>handleDelete(deleteMessage!.id)}>Delete</button>
             </div>
           </form>
           <h3 className="font-bold text-lg">Delete Message</h3>
