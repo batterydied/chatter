@@ -9,7 +9,9 @@ const MessageSchema = z.object({
     fileSize: z.number().optional(),
     createdAt: z.any(),
     updatedAt: z.any().optional(),
-    isEdited: z.boolean()
+    isEdited: z.boolean(),
+    isReply: z.boolean(),
+    replyId: z.string()
 });
 
 export default MessageSchema

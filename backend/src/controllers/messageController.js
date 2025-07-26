@@ -59,7 +59,9 @@ class MessageController{
                 fileName,
                 fileSize,
                 createdAt: serverTimestamp(),
-                isEdited: false
+                isEdited: false,
+                isReply: false,
+                replyId: '',
             }
 
             MessageSchema.parse(rawMessage)

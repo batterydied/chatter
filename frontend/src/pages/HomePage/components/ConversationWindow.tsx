@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
@@ -18,7 +18,9 @@ type RawMessage = {
   senderId: string
   text: string
   type: string
-  isEdited: boolean
+  isEdited: boolean,
+  isReply: boolean,
+  replyId: string
 }
 
 type SerializedMessage = {
@@ -28,7 +30,9 @@ type SerializedMessage = {
   messageTime: string,
   senderId: string,
   timestamp: Date,
-  isEdited: boolean
+  isEdited: boolean,
+  isReply: boolean,
+  replyId: string
 }
 
 const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps) => {
@@ -44,11 +48,16 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([])
   const [editMessage, setEditMessage] = useState<SerializedMessage | null>(null)
   const [editMessageInputMessage, setEditMessageInputMessage] = useState('')
+  const [replyMessage, setReplyMessage] = useState<SerializedMessage | null>(null)
+  const [replyUsername, setReplyUsername] = useState<string | null>(null)
 
   const { scrollContainerRef, setShouldScrollToBottom, isUserNearBottom, bottomRef } = useAutoScroll(messages)
 
+  const inputElRef = useRef<HTMLInputElement | null>(null);
+
   const inputRef = useCallback((ele: HTMLInputElement | null) => {
-    if (ele) {
+    if(ele){
+      inputElRef.current = ele;
       ele.focus();
     }
   }, []);
@@ -60,7 +69,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         const docSnap = await getDoc(docRef);
         const username = docSnap.exists()
           ? docSnap.data().username
-          : 'Unknown User';
+          : 'Deleted User';
         
         
         const timestamp = typeof m.createdAt === 'string' ? new Date(m.createdAt) : m.createdAt.toDate()
@@ -72,7 +81,9 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
           messageTime,
           senderId: m.senderId,
           timestamp,
-          isEdited: m.isEdited
+          isEdited: m.isEdited,
+          isReply: m.isReply,
+          replyId: m.replyId
         };
       })
     );
@@ -148,9 +159,13 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   }
   
   const cancelEdit = () => {
-    setEditMessage(null);
+    setEditMessage(null)
   };
 
+  const handleReply = (msg: SerializedMessage) => {
+    setReplyMessage(msg)
+    inputElRef.current?.focus();
+  }
 
   const handleUpdate = useCallback((msg: SerializedMessage, updatedMsg: string) => {
     const sendUpdate = async (msgId: string, updatedMsg: string) => {
@@ -177,6 +192,25 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     }
     setEditMessage(null)
   }, [conversationId])
+
+  useEffect(() => {
+    if (!replyMessage) {
+      setReplyUsername(null);
+      return;
+    }
+
+    const fetchUsername = async () => {
+      const userRef = doc(db, 'users', replyMessage.senderId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        setReplyUsername(userSnap.data().username);
+      } else {
+        setReplyUsername('Deleted User');
+      }
+    };
+
+    fetchUsername();
+  }, [replyMessage]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -210,6 +244,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         const isHovered = hoveredMessageId === msg.id
         const isUser = userId === msg.senderId
         const isEditingMessage = editMessage?.id === msg.id
+        const isReply = replyMessage?.id === msg.id
 
         return (
           <div
@@ -219,7 +254,15 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
             onMouseEnter={() => handleSelectHoverId(msg.id)}
           >
             <div
-              className={`chat ${isUser ? 'chat-end' : 'chat-start'} ${isHovered && 'bg-base-200'} relative`}
+              className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
+                isReply && isHovered ? 
+                'bg-blue-900'
+                : isReply ? 
+                'bg-blue-950'
+                : isHovered ?
+                'bg-base-200'
+                : 'bg-base-300'
+              } relative`}
             >
               <div className="chat-image avatar">
                 <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
@@ -253,7 +296,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
               >
                 <button onMouseEnter={()=>setHoveredIcon('react')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReactIcon iconColor='#fff'/></button>
                 {userId == msg.senderId && <button onClick={()=>handleEdit(msg)} onMouseEnter={()=>setHoveredIcon('edit')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><EditIcon iconColor='#fff'/></button>}
-                <button onMouseEnter={()=>setHoveredIcon('reply')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReplyIcon iconColor='#fff'/></button>
+                <button onClick={()=>handleReply(msg)} onMouseEnter={()=>setHoveredIcon('reply')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReplyIcon iconColor='#fff'/></button>
                 {userId == msg.senderId && <button onClick={()=>handleDeleteConfirmation(msg)} onMouseEnter={()=>setHoveredIcon('delete')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'} rounded-md p-1`}><DeleteIcon iconColor='#D0021B'/></button>}
               </div>
             )}
@@ -292,7 +335,9 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
           senderId: data.senderId,
           text: data.text,
           type: data.type,
-          isEdited: data.isEdited
+          isEdited: data.isEdited,
+          isReply: data.isReply,
+          replyId: data.replyId
         };
       });
 
@@ -369,6 +414,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       }
     }
 
+
+
     const handleScroll = () => {
       if (scrollContainer.scrollTop < 50 && !loadingMore && hasMore) {
         fetchMoreMessages()
@@ -402,6 +449,12 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         <div ref={bottomRef}></div>
       </div>
       <form onSubmit={handleSubmit}>
+        {replyMessage && 
+          <div
+            className={`text-sm flex justify-between ${replyUsername ? 'opacity-100' : 'opacity-0'}`}
+          >
+            Replying to {replyUsername}<button onClick={()=>setReplyMessage(null)}>X</button>
+          </div>}
         <input placeholder={'Type a message...'} value={inputMessage} onChange={(e)=>setInputMessage(e.target.value)} type="text" className="input input-md items-end w-full focus:outline-0 mt-2" ref={inputRef}/>
       </form>
       <dialog id="delete_confirmation_modal" className="modal">
@@ -472,7 +525,6 @@ const uploadMessage = async (conversationId: string, userId: string, inputMessag
     }
   }
 }
-
 
 
 export default ConversationWindow
