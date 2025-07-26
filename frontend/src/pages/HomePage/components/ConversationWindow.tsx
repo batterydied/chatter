@@ -130,10 +130,10 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     setHoveredMessageId(null)
   }
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = () => {
+    console.log('handleSubmit called, current replyMessage:', replyMessage)
     if(inputMessage){
-      uploadMessage(conversationId, userId, inputMessage)
+      uploadMessage(conversationId, userId, inputMessage, replyMessage != null, replyMessage?.id || '')
       setShouldScrollToBottom(true)
       setInputMessage('')
     }
@@ -448,15 +448,25 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         <div className='mt-3'>{renderMessages(messages, userId)}</div>
         <div ref={bottomRef}></div>
       </div>
-      <form onSubmit={handleSubmit}>
+      <div>
         {replyMessage && 
           <div
             className={`text-sm flex justify-between ${replyUsername ? 'opacity-100' : 'opacity-0'}`}
           >
             Replying to {replyUsername}<button onClick={()=>setReplyMessage(null)}>X</button>
           </div>}
-        <input placeholder={'Type a message...'} value={inputMessage} onChange={(e)=>setInputMessage(e.target.value)} type="text" className="input input-md items-end w-full focus:outline-0 mt-2" ref={inputRef}/>
-      </form>
+        <input onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            handleSubmit();
+          }
+        }}
+        placeholder={'Type a message...'} 
+        value={inputMessage} 
+        onChange={(e)=>setInputMessage(e.target.value)} 
+        type="text" 
+        className="input input-md items-end w-full focus:outline-0 mt-2" 
+        ref={inputRef}/>
+      </div>
       <dialog id="delete_confirmation_modal" className="modal">
         <div className="modal-box">
           <form method="dialog">
@@ -509,12 +519,14 @@ const formatMessageTime = (date: Date): string => {
   }
 }
 
-const uploadMessage = async (conversationId: string, userId: string, inputMessage: string) => {
+const uploadMessage = async (conversationId: string, userId: string, inputMessage: string, isReply: boolean, replyId: string) => {
   try{
     const message = {
       senderId: userId,
       type: 'text',
-      text: inputMessage
+      text: inputMessage,
+      isReply,
+      replyId
     }
     await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`, message)
   }catch(e){

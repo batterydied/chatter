@@ -46,7 +46,7 @@ class MessageController{
     async createMessage(req, res){
         const { conversationId } = req.params
 
-        const { senderId, type, text, fileUrl, fileName, fileSize } = req.body
+        const { senderId, type, text, fileUrl, fileName, fileSize, isReply, replyId } = req.body
         const conversationRef = doc(db, 'conversations', conversationId)
         const messageCollectionRef = collection(db, 'conversations', conversationId, 'messages')
 
@@ -60,8 +60,8 @@ class MessageController{
                 fileSize,
                 createdAt: serverTimestamp(),
                 isEdited: false,
-                isReply: false,
-                replyId: '',
+                isReply,
+                replyId
             }
 
             MessageSchema.parse(rawMessage)
