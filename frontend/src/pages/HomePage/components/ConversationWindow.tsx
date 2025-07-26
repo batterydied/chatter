@@ -245,6 +245,11 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         const isUser = userId === msg.senderId
         const isEditingMessage = editMessage?.id === msg.id
         const isReply = replyMessage?.id === msg.id
+        const repliedMessageId = msg.replyId
+        let repliedMessage: SerializedMessage | null = null
+        if(repliedMessageId !== ''){
+          repliedMessage = messages.filter((m)=>m.id === repliedMessageId)[0]
+        }
 
         return (
           <div
@@ -276,13 +281,23 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
                 </div>
               )}
               <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+                <div className='border-l-2 border-l-accent px-2 flex-col text-sm'>
+                  {repliedMessageId === '' ? null : repliedMessage ? 
+                    <>
+                      <div className='flex justify-start text-gray-400'>Replying to {repliedMessage.username}</div>
+                      <div className='flex justify-start'>{repliedMessage.text}</div>
+                    </>
+                    : 
+                    <div className='flex justify-start text-gray-400'>Original message was deleted</div>
+                  }
+                </div>
                 {isEditingMessage ? 
                 <div>
                   <input ref={inputRef} onChange={(e) => setEditMessageInputMessage(e.target.value)} className='w-full focus:outline-none' value={editMessageInputMessage}/>
                   <p className='text-sm'>Escape to <span className='text-accent'>cancel</span>, enter to <span className='text-accent'>save</span></p>
                 </div> 
                 : 
-                <div>
+                <div className='flex justify-start'>
                   {msg.text}
                   {msg.isEdited && <span className={`absolute bottom-0 ${isUser ? 'right-full' : 'left-full'} px-2 text-xs text-gray-300`}>(edited)</span>}
                 </div>
