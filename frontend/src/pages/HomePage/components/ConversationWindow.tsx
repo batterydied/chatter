@@ -3,9 +3,10 @@ import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import type { Firestore, Timestamp } from 'firebase/firestore'
-import useAutoScroll from '../../../hooks/useAutoScroll'
 import { EditIcon, ReactIcon, ReplyIcon, DeleteIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
+import { AutoSizer, CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
+import type { ListRowRenderer } from 'react-virtualized'
 
 type ConversationWindowProps = {
   conversationId: string,
@@ -45,15 +46,17 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [earliestMessageId, setEarliestMessageId] = useState<string | null>(null)
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<SerializedMessage | null>(null)
-  const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([])
   const [editMessage, setEditMessage] = useState<SerializedMessage | null>(null)
   const [editMessageInputMessage, setEditMessageInputMessage] = useState('')
   const [replyMessage, setReplyMessage] = useState<SerializedMessage | null>(null)
   const [replyUsername, setReplyUsername] = useState<string | null>(null)
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false)
+  const [initialScrollDone, setInitialScrollDone] = useState(false)
 
-  const { scrollContainerRef, setShouldScrollToBottom, isUserNearBottom, bottomRef } = useAutoScroll(messages)
+  const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
 
-  const inputElRef = useRef<HTMLInputElement | null>(null);
+  const inputElRef = useRef<HTMLInputElement | null>(null)
+  const listRef = useRef<List | null>(null)
 
   const inputRef = useCallback((ele: HTMLInputElement | null) => {
     if(ele){
@@ -101,26 +104,14 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       setHasMore(!res.data.noMore)
 
       const serialized = await serializeMessages(rawMessages, db)
-      if(serialized.length > 0) {
-        setEarliestMessageId(serialized[0].id);
-        setMessages(serialized);
-      }
 
-      setShouldScrollToBottom(true)
-
-      setLoading(false)
-
-      return(serialized)
-
+      return serialized
     } catch (e) {
-      if (axios.isAxiosError(e)) {
-        console.log(e.message)
-      } else {
-        console.log(e)
-      }
+      console.error('fetchMessages error', e)
       return []
     }
-  }, [conversationId, setShouldScrollToBottom])
+  }, [conversationId])
+
 
   const handleSelectHoverId = (msgId: string)=>{
     setHoveredMessageId(msgId)
@@ -131,10 +122,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   }
   
   const handleSubmit = () => {
-    console.log('handleSubmit called, current replyMessage:', replyMessage)
     if(inputMessage){
       uploadMessage(conversationId, userId, inputMessage, replyMessage != null, replyMessage?.id || '')
-      setShouldScrollToBottom(true)
       setInputMessage('')
     }
   }
@@ -147,7 +136,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const sendDelete = async (msgId: string) => {
     try{
       await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/${msgId}`)
-      setDeletedMessageIds((prev) => [...prev, msgId])
+      setMessages((prev) => prev.filter((m) => m.id !== msgId))
     }catch{
       toast.error('Could not delete message, try again later.')
     }
@@ -231,108 +220,223 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     };
   }, [editMessage, editMessageInputMessage, handleUpdate]);
 
+const handleScroll = useCallback(
+  async ({scrollTop}:{scrollTop: number}) => {
+    console.log({initialScrollDone, loadingMore, hasMore, listRef: !!listRef.current, scrollTop});
+    if (!initialScrollDone || !listRef.current || loadingMore || !hasMore) return;
+    if (scrollTop < 150) {
+      setLoadingMore(true);
+      const list = listRef.current
+      const moreMessages = await fetchMessages(15, earliestMessageId);
+      const newEarliestId = moreMessages.length > 0 ? moreMessages[0].id : earliestMessageId;
+      const newMessages = [...moreMessages, ...messages];
 
-  const renderMessages = (messages: SerializedMessage[], userId: string) => {
-    if(messages.length != 0){
-      return messages.map((msg, i) => {
-        if (deletedMessageIds.includes(msg.id)) return null;
-        const prev = messages[i - 1];
-        const isGrouped =
-          prev &&
-          prev.senderId === msg.senderId &&
-          Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000;
-        const isHovered = hoveredMessageId === msg.id
-        const isUser = userId === msg.senderId
-        const isEditingMessage = editMessage?.id === msg.id
-        const isReply = replyMessage?.id === msg.id
-        const repliedMessageId = msg.replyId
-        let repliedMessage: SerializedMessage | null = null
-        if(repliedMessageId !== ''){
-          repliedMessage = messages.filter((m)=>m.id === repliedMessageId)[0]
-        }
+      // Estimate height of new rows added (fallback to 100px each if unknown)
+      const addedHeight = moreMessages.reduce((sum, _, i) => {
+        return sum + cellMeasurerCache.current.rowHeight({ index: i })
+      }, 0);
 
-        return (
+      setMessages(newMessages);
+      setEarliestMessageId(newEarliestId);
+      cellMeasurerCache.current.clearAll();
+
+      requestAnimationFrame(() => {
+        list.recomputeRowHeights();
+        requestAnimationFrame(() => {
+          listRef.current?.scrollToPosition(scrollTop + addedHeight);
+          setLoadingMore(false);
+        });
+      });
+    }
+  },
+  [fetchMessages, hasMore, loadingMore, earliestMessageId, initialScrollDone, messages]
+);
+
+  const renderMessages: ListRowRenderer = ({ index, key, parent, style }) => {
+  const msg = messages[index]
+  const prev = index > 0 ? messages[index - 1] : null
+  const isGrouped =
+    prev &&
+    prev.senderId === msg.senderId &&
+    Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000
+  const isHovered = hoveredMessageId === msg.id
+  const isUser = userId === msg.senderId
+  const isEditingMessage = editMessage?.id === msg.id
+  const isReply = replyMessage?.id === msg.id
+  const repliedMessageId = msg.replyId
+  let repliedMessage: SerializedMessage | null = null
+  if (repliedMessageId !== '') {
+    repliedMessage = messages.find((m) => m.id === repliedMessageId) || null
+  }
+
+  return (
+    <CellMeasurer
+      key={key}
+      cache={cellMeasurerCache.current}
+      parent={parent}
+      columnIndex={0}
+      rowIndex={index}
+    >
+      {({ measure }) => (
+        <div
+          style={style}
+          className="relative"
+          onMouseLeave={() => {
+            handleRemoveHoverId()
+            measure() // re-measure if needed
+          }}
+          onMouseEnter={() => {
+            handleSelectHoverId(msg.id)
+            measure()
+          }}
+        >
           <div
-            key={msg.id}
-            className="relative"
-            onMouseLeave={handleRemoveHoverId}
-            onMouseEnter={() => handleSelectHoverId(msg.id)}
-          >
-            <div
-              className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
-                isReply && isHovered ? 
-                'bg-blue-900'
-                : isReply ? 
-                'bg-blue-950'
-                : isHovered ?
-                'bg-base-200'
+            className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
+              isReply && isHovered
+                ? 'bg-blue-900'
+                : isReply
+                ? 'bg-blue-950'
+                : isHovered
+                ? 'bg-base-200'
                 : 'bg-base-300'
-              } relative`}
-            >
-              <div className="chat-image avatar">
-                <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
-                  <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
-                </div>
-              </div>
-              {!isGrouped && (
-                <div className="chat-header">
-                  <p>{msg.username}</p>
-                  <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-                </div>
-              )}
-              <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-                <div className='border-l-2 border-l-accent px-2 flex-col text-sm'>
-                  {repliedMessageId === '' ? null : repliedMessage ? 
-                    <>
-                      <div className='flex justify-start text-gray-400'>Replying to {repliedMessage.username}</div>
-                      <div className='flex justify-start'>{repliedMessage.text}</div>
-                    </>
-                    : 
-                    <div className='flex justify-start text-gray-400'>Original message was deleted</div>
-                  }
-                </div>
-                {isEditingMessage ? 
-                <div>
-                  <input ref={inputRef} onChange={(e) => setEditMessageInputMessage(e.target.value)} className='w-full focus:outline-none' value={editMessageInputMessage}/>
-                  <p className='text-sm'>Escape to <span className='text-accent'>cancel</span>, enter to <span className='text-accent'>save</span></p>
-                </div> 
-                : 
-                <div className='flex justify-start'>
-                  {msg.text}
-                  {msg.isEdited && <span className={`absolute bottom-0 ${isUser ? 'right-full' : 'left-full'} px-2 text-xs text-gray-300`}>(edited)</span>}
-                </div>
-                }
+            } relative`}
+          >
+            <div className="chat-image avatar">
+              <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
+                <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
               </div>
             </div>
-            
-            {isHovered && (
-              <div
-                className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center"
-              >
-                <button onMouseEnter={()=>setHoveredIcon('react')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReactIcon iconColor='#fff'/></button>
-                {userId == msg.senderId && <button onClick={()=>handleEdit(msg)} onMouseEnter={()=>setHoveredIcon('edit')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><EditIcon iconColor='#fff'/></button>}
-                <button onClick={()=>handleReply(msg)} onMouseEnter={()=>setHoveredIcon('reply')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'} rounded-md p-1`}><ReplyIcon iconColor='#fff'/></button>
-                {userId == msg.senderId && <button onClick={()=>handleDeleteConfirmation(msg)} onMouseEnter={()=>setHoveredIcon('delete')} onMouseLeave={()=>setHoveredIcon(null)} className={`cursor-pointer ${hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'} rounded-md p-1`}><DeleteIcon iconColor='#D0021B'/></button>}
+            {!isGrouped && (
+              <div className="chat-header">
+                <p>{msg.username}</p>
+                <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
               </div>
             )}
+            <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+              <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
+                {repliedMessageId === '' ? null : repliedMessage ? (
+                  <>
+                    <div className="flex justify-start text-gray-400">
+                      Replying to {repliedMessage.username}
+                    </div>
+                    <div className="flex justify-start">{repliedMessage.text}</div>
+                  </>
+                ) : (
+                  <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
+                )}
+              </div>
+              {isEditingMessage ? (
+                <div>
+                  <input
+                    ref={inputRef}
+                    onChange={(e) => {
+                      setEditMessageInputMessage(e.target.value)
+                      measure()
+                    }}
+                    className="w-full focus:outline-none"
+                    value={editMessageInputMessage}
+                  />
+                  <p className="text-sm">
+                    Escape to <span className="text-accent">cancel</span>, enter to{' '}
+                    <span className="text-accent">save</span>
+                  </p>
+                </div>
+              ) : (
+                <div className="flex justify-start">
+                  {msg.text}
+                  {msg.isEdited && (
+                    <span
+                      className={`absolute bottom-0 ${
+                        isUser ? 'right-full' : 'left-full'
+                      } px-2 text-xs text-gray-300`}
+                    >
+                      (edited)
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        )
-      })
-    }else{
-      return (
-        <div>
-          <span>This is the beginning of your direct message history!</span> 
-        </div>)
-    } 
-  }
+
+          {isHovered && (
+            <div className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center">
+              <button
+                onMouseEnter={() => setHoveredIcon('react')}
+                onMouseLeave={() => setHoveredIcon(null)}
+                className={`cursor-pointer ${
+                  hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'
+                } rounded-md p-1`}
+              >
+                <ReactIcon iconColor="#fff" />
+              </button>
+              {userId == msg.senderId && (
+                <button
+                  onClick={() => handleEdit(msg)}
+                  onMouseEnter={() => setHoveredIcon('edit')}
+                  onMouseLeave={() => setHoveredIcon(null)}
+                  className={`cursor-pointer ${
+                    hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'
+                  } rounded-md p-1`}
+                >
+                  <EditIcon iconColor="#fff" />
+                </button>
+              )}
+              <button
+                onClick={() => handleReply(msg)}
+                onMouseEnter={() => setHoveredIcon('reply')}
+                onMouseLeave={() => setHoveredIcon(null)}
+                className={`cursor-pointer ${
+                  hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'
+                } rounded-md p-1`}
+              >
+                <ReplyIcon iconColor="#fff" />
+              </button>
+              {userId == msg.senderId && (
+                <button
+                  onClick={() => handleDeleteConfirmation(msg)}
+                  onMouseEnter={() => setHoveredIcon('delete')}
+                  onMouseLeave={() => setHoveredIcon(null)}
+                  className={`cursor-pointer ${
+                    hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'
+                  } rounded-md p-1`}
+                >
+                  <DeleteIcon iconColor="#D0021B" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </CellMeasurer>
+  )
+}
+
   useEffect(() => {
     const init = async () => {
       setLoading(true)
       setMessages([])
-      await fetchMessages(15, null)
+      const initialMessages = await fetchMessages(15, null)
+      if(initialMessages.length != 0){
+        setEarliestMessageId(initialMessages[0].id)
+        setMessages(initialMessages)
+      }
+      requestAnimationFrame(() => {
+        setShouldScrollToBottom(true)
+        setLoading(false)
+      })
     }
     init()
   }, [fetchMessages])
+
+  useEffect(()=>{
+    if(shouldScrollToBottom && messages.length > 0){
+      listRef.current?.scrollToRow(messages.length - 1)
+      requestAnimationFrame(() => {
+        setShouldScrollToBottom(false)
+        setInitialScrollDone(true)
+      })
+    }
+  }, [shouldScrollToBottom, messages])
 
   useEffect(() => {
     const queryRef = query(
@@ -364,12 +468,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
         
         const exists = prev.some((m) => m.id === newMessage.id);
         if (exists) return prev;
-        
-        // Check scroll position before updating messages
-        const container = scrollContainerRef.current;
-        const nearBottom = isUserNearBottom(container);
 
-        if(nearBottom){
+        if (newMessage.senderId === userId) {
           setShouldScrollToBottom(true);
         }
         
@@ -378,68 +478,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     });
     
     return unsub;
-  }, [conversationId, isUserNearBottom, scrollContainerRef, setShouldScrollToBottom]);
-
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current
-    if (!scrollContainer) return
-
-    const fetchMoreMessages = async () => {
-      if (!earliestMessageId || loadingMore || !hasMore) return
-
-      const oldScrollHeight = scrollContainer.scrollHeight
-
-      setLoadingMore(true)
-      setShouldScrollToBottom(false)
-
-      try {
-        const axiosParams = {
-          params: {
-            size: 15,
-            prevMessageId: earliestMessageId,
-          },
-        }
-
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/page`,
-          axiosParams
-        )
-
-        const rawMessages: RawMessage[] = res.data.messages
-        const serialized = await serializeMessages(rawMessages, db)
-
-        setMessages((prev) => [...serialized, ...prev])
-        if (serialized.length > 0) {
-          setEarliestMessageId(serialized[0].id)
-        }
-
-        setHasMore(!res.data.noMore)
-        requestAnimationFrame(() => {
-          const newScrollHeight = scrollContainer.scrollHeight
-          scrollContainer.scrollTop += newScrollHeight - oldScrollHeight
-        })
-      } catch (e) {
-        if (axios.isAxiosError(e)) {
-          console.log(e.message)
-        } else {
-          console.log(e)
-        }
-      } finally {
-        setLoadingMore(false)
-      }
-    }
-
-
-
-    const handleScroll = () => {
-      if (scrollContainer.scrollTop < 50 && !loadingMore && hasMore) {
-        fetchMoreMessages()
-      }
-    };
-
-    scrollContainer.addEventListener('scroll', handleScroll)
-    return () => scrollContainer.removeEventListener('scroll', handleScroll)
-  }, [earliestMessageId, hasMore, loadingMore, conversationId, scrollContainerRef, setShouldScrollToBottom])
+  }, [conversationId, userId]);
 
 
   if(!messages){
@@ -458,11 +497,24 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   } 
   return (
     <div className='h-full w-full flex flex-col'>
-      <div className='flex-1 overflow-y-auto' ref={scrollContainerRef}>
         {loadingMore && <span className="loading loading-dots loading-md"></span>}
-        <div className='mt-3'>{renderMessages(messages, userId)}</div>
-        <div ref={bottomRef}></div>
-      </div>
+        <div className='mt-3 w-full h-screen'>
+          <AutoSizer>
+            {({width, height})=>
+              <List
+                width={width}
+                height={height}
+                rowHeight={cellMeasurerCache.current.rowHeight}
+                deferredMeasurementCache={cellMeasurerCache.current}
+                rowCount={messages.length}
+                rowRenderer={renderMessages}
+                scrollToIndex={shouldScrollToBottom ? messages.length - 1 : undefined}
+                onScroll={handleScroll}
+                ref={listRef}
+              />
+            }
+          </AutoSizer>
+        </div>
       <div>
         {replyMessage && 
           <div
