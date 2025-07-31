@@ -54,6 +54,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [initialScrollDone, setInitialScrollDone] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(false)
 
+  const subscriptionDict = useRef<Record<string, ()=>void>>({})
+
   const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
 
   const inputElRef = useRef<HTMLInputElement | null>(null)
@@ -113,6 +115,14 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     }
   }, [conversationId])
 
+  useEffect(()=>{
+    for (const key in subscriptionDict.current) {
+      {
+        subscriptionDict.current[key]()
+      }
+    }
+    subscriptionDict.current = {}
+  }, [conversationId])
 
   const handleSelectHoverId = (msgId: string)=>{
     setHoveredMessageId(msgId)
@@ -446,13 +456,12 @@ const handleScroll = useCallback(
 
 
   useEffect(() => {
-    const unsubscribers: (() => void)[] = [];
-
     messages.forEach((msg) => {
       if(msg.senderId === userId){
         return
       }
       const msgRef = doc(db, 'conversations', conversationId, 'messages', msg.id);
+
       const unsub = onSnapshot(msgRef, async (snapshot) => {
         if (!snapshot.exists()) return;
 
@@ -468,17 +477,16 @@ const handleScroll = useCallback(
           replyId: data.replyId,
         }], db);
 
+        if(!(msg.id in subscriptionDict.current)){
+          subscriptionDict.current[msg.id] = unsub
+        }
+
         setMessages((prev) =>
           prev.map((m) => (m.id !== serialized.id ? m : serialized))
         );
       });
-
-      unsubscribers.push(unsub);
     });
 
-    return () => {
-      unsubscribers.forEach((unsub) => unsub());
-    };
   }, [conversationId, messages, userId]);
 
 
