@@ -52,6 +52,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const [replyUsername, setReplyUsername] = useState<string | null>(null)
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false)
   const [initialScrollDone, setInitialScrollDone] = useState(false)
+  const [isNearBottom, setIsNearBottom] = useState(false)
 
   const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
 
@@ -221,9 +222,13 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   }, [editMessage, editMessageInputMessage, handleUpdate]);
 
 const handleScroll = useCallback(
-  async ({scrollTop}:{scrollTop: number}) => {
-    console.log({initialScrollDone, loadingMore, hasMore, listRef: !!listRef.current, scrollTop});
+  async ({scrollTop, clientHeight, scrollHeight}:{scrollTop: number, clientHeight: number, scrollHeight: number}) => {
     if (!initialScrollDone || !listRef.current || loadingMore || !hasMore) return;
+    
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+    const threshold = 75;
+    setIsNearBottom(distanceFromBottom < threshold);
+
     if (scrollTop < 150) {
       setLoadingMore(true);
       const list = listRef.current
@@ -231,7 +236,6 @@ const handleScroll = useCallback(
       const newEarliestId = moreMessages.length > 0 ? moreMessages[0].id : earliestMessageId;
       const newMessages = [...moreMessages, ...messages];
 
-      // Estimate height of new rows added (fallback to 100px each if unknown)
       const addedHeight = moreMessages.reduce((sum, _, i) => {
         return sum + cellMeasurerCache.current.rowHeight({ index: i })
       }, 0);
@@ -328,7 +332,7 @@ const handleScroll = useCallback(
               {isEditingMessage ? (
                 <div>
                   <input
-                    ref={inputRef}
+                    autoFocus
                     onChange={(e) => {
                       setEditMessageInputMessage(e.target.value)
                       measure()
@@ -371,7 +375,9 @@ const handleScroll = useCallback(
               </button>
               {userId == msg.senderId && (
                 <button
-                  onClick={() => handleEdit(msg)}
+                  onClick={() => {
+                    handleEdit(msg); 
+                  }}
                   onMouseEnter={() => setHoveredIcon('edit')}
                   onMouseLeave={() => setHoveredIcon(null)}
                   className={`cursor-pointer ${
@@ -438,6 +444,44 @@ const handleScroll = useCallback(
     }
   }, [shouldScrollToBottom, messages])
 
+
+  useEffect(() => {
+    const unsubscribers: (() => void)[] = [];
+
+    messages.forEach((msg) => {
+      if(msg.senderId === userId){
+        return
+      }
+      const msgRef = doc(db, 'conversations', conversationId, 'messages', msg.id);
+      const unsub = onSnapshot(msgRef, async (snapshot) => {
+        if (!snapshot.exists()) return;
+
+        const data = snapshot.data();
+        const [serialized] = await serializeMessages([{
+          id: snapshot.id,
+          createdAt: data.createdAt,
+          senderId: data.senderId,
+          text: data.text,
+          type: data.type,
+          isEdited: data.isEdited,
+          isReply: data.isReply,
+          replyId: data.replyId,
+        }], db);
+
+        setMessages((prev) =>
+          prev.map((m) => (m.id !== serialized.id ? m : serialized))
+        );
+      });
+
+      unsubscribers.push(unsub);
+    });
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [conversationId, messages, userId]);
+
+
   useEffect(() => {
     const queryRef = query(
       collection(db, 'conversations', conversationId, 'messages'),
@@ -469,16 +513,16 @@ const handleScroll = useCallback(
         const exists = prev.some((m) => m.id === newMessage.id);
         if (exists) return prev;
 
-        if (newMessage.senderId === userId) {
+        if (newMessage.senderId === userId || isNearBottom) {
           setShouldScrollToBottom(true);
         }
-        
+
         return [...prev, newMessage];
       });
     });
     
     return unsub;
-  }, [conversationId, userId]);
+  }, [conversationId, userId, isNearBottom]);
 
 
   if(!messages){
@@ -497,8 +541,8 @@ const handleScroll = useCallback(
   } 
   return (
     <div className='h-full w-full flex flex-col'>
-        {loadingMore && <span className="loading loading-dots loading-md"></span>}
-        <div className='mt-3 w-full h-screen'>
+        {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
+        <div className='my-3 w-full h-screen'>
           <AutoSizer>
             {({width, height})=>
               <List
