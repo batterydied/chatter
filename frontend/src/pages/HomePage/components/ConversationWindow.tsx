@@ -7,6 +7,7 @@ import { EditIcon, ReactIcon, ReplyIcon, DeleteIcon } from '../../../assets/icon
 import { toast } from 'sonner'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
+import forceRemeasure from '../../../utils/forceRemeasure'
 
 type ConversationWindowProps = {
   conversationId: string,
@@ -59,7 +60,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
 
   const textareaElRef = useRef<HTMLTextAreaElement | null>(null)
-  const listRef = useRef<List | null>(null)
+  const listRef = useRef<List>(null)
   const measureRef = useRef<(() => void) | null>(null)
 
 
@@ -150,6 +151,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     try{
       await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/${msgId}`)
       setMessages((prev) => prev.filter((m) => m.id !== msgId))
+      forceRemeasure(cellMeasurerCache, listRef)
     }catch{
       toast.error('Could not delete message, try again later.')
     }
@@ -162,7 +164,8 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   
   const cancelEdit = () => {
     setEditMessage(null)
-  };
+    forceRemeasure(cellMeasurerCache, listRef)
+  }
 
   const handleReply = (msg: SerializedMessage) => {
     setReplyMessage(msg)
@@ -192,7 +195,10 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     else if(msg.text !== updatedMsg){
       sendUpdate(msg.id, updatedMsg)
     }
+
     setEditMessage(null)
+
+    forceRemeasure(cellMeasurerCache, listRef)
   }, [conversationId])
 
   useEffect(() => {
@@ -327,7 +333,7 @@ const handleScroll = useCallback(
                   : isHovered
                   ? 'bg-base-200'
                   : 'bg-base-300'
-              } relative text-left whitespace-normal break-words`}
+              } relative text-left whitespace-normal`}
             >
               <div className="chat-image avatar">
                 <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
@@ -398,7 +404,7 @@ const handleScroll = useCallback(
                 {userId == msg.senderId && (
                   <button
                     onClick={() => {
-                      handleEdit(msg); 
+                      handleEdit(msg)
                       requestAnimationFrame(measure)
                     }}
                     onMouseEnter={() => setHoveredIcon('edit')}
