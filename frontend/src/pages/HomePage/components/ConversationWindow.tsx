@@ -58,12 +58,14 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
   const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
 
-  const inputElRef = useRef<HTMLInputElement | null>(null)
+  const textareaElRef = useRef<HTMLTextAreaElement | null>(null)
   const listRef = useRef<List | null>(null)
+  const measureRef = useRef<(() => void) | null>(null)
 
-  const inputRef = useCallback((ele: HTMLInputElement | null) => {
+
+  const textareaRef = useCallback((ele: HTMLTextAreaElement | null) => {
     if(ele){
-      inputElRef.current = ele;
+      textareaElRef.current = ele;
       ele.focus();
     }
   }, []);
@@ -164,7 +166,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
   const handleReply = (msg: SerializedMessage) => {
     setReplyMessage(msg)
-    inputElRef.current?.focus();
+    textareaElRef.current?.focus();
   }
 
   const handleUpdate = useCallback((msg: SerializedMessage, updatedMsg: string) => {
@@ -215,7 +217,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        cancelEdit();
+        cancelEdit()
       }
       if(e.key === 'Enter'){
         handleUpdate(editMessage!, editMessageInputMessage)
@@ -224,12 +226,24 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
     if (editMessage) {
       window.addEventListener('keydown', handleKeyDown);
+
     }
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [editMessage, editMessageInputMessage, handleUpdate]);
+
+  useEffect(() => {
+    const onResize = ()=> {
+      cellMeasurerCache.current.clearAll()
+      listRef.current?.recomputeRowHeights()
+      listRef.current?.forceUpdateGrid()
+    }
+
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
 const handleScroll = useCallback(
   async ({scrollTop, clientHeight, scrollHeight}:{scrollTop: number, clientHeight: number, scrollHeight: number}) => {
@@ -291,138 +305,137 @@ const handleScroll = useCallback(
       columnIndex={0}
       rowIndex={index}
     >
-      {({ measure }) => (
-        <div
-          style={style}
-          className="relative"
-          onMouseLeave={() => {
-            handleRemoveHoverId()
-            measure() // re-measure if needed
-          }}
-          onMouseEnter={() => {
-            handleSelectHoverId(msg.id)
-            measure()
-          }}
-        >
+      {({ measure }) => {
+        measureRef.current = measure
+        return (
           <div
-            className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
-              isReply && isHovered
-                ? 'bg-blue-900'
-                : isReply
-                ? 'bg-blue-950'
-                : isHovered
-                ? 'bg-base-200'
-                : 'bg-base-300'
-            } relative`}
+            style={style}
+            className="relative"
+            onMouseLeave={() => {
+              handleRemoveHoverId()
+            }}
+            onMouseEnter={() => {
+              handleSelectHoverId(msg.id)
+            }}
           >
-            <div className="chat-image avatar">
-              <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
-                <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
-              </div>
-            </div>
-            {!isGrouped && (
-              <div className="chat-header">
-                <p>{msg.username}</p>
-                <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-              </div>
-            )}
-            <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-              <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
-                {repliedMessageId === '' ? null : repliedMessage ? (
-                  <>
-                    <div className="flex justify-start text-gray-400">
-                      Replying to {repliedMessage.username}
-                    </div>
-                    <div className="flex justify-start">{repliedMessage.text}</div>
-                  </>
-                ) : (
-                  <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
-                )}
-              </div>
-              {isEditingMessage ? (
-                <div>
-                  <input
-                    autoFocus
-                    onChange={(e) => {
-                      setEditMessageInputMessage(e.target.value)
-                      measure()
-                    }}
-                    className="w-full focus:outline-none"
-                    value={editMessageInputMessage}
-                  />
-                  <p className="text-sm">
-                    Escape to <span className="text-accent">cancel</span>, enter to{' '}
-                    <span className="text-accent">save</span>
-                  </p>
+            <div
+              className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
+                isReply && isHovered
+                  ? 'bg-blue-900'
+                  : isReply
+                  ? 'bg-blue-950'
+                  : isHovered
+                  ? 'bg-base-200'
+                  : 'bg-base-300'
+              } relative text-left whitespace-normal break-words`}
+            >
+              <div className="chat-image avatar">
+                <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
+                  <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
                 </div>
-              ) : (
-                <div className="flex justify-start">
-                  {msg.text}
-                  {msg.isEdited && (
-                    <span
-                      className={`absolute bottom-0 ${
-                        isUser ? 'right-full' : 'left-full'
-                      } px-2 text-xs text-gray-300`}
-                    >
-                      (edited)
-                    </span>
+              </div>
+              {!isGrouped && (
+                <div className="chat-header">
+                  <p>{msg.username}</p>
+                  <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
+                </div>
+              )}
+              <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+                <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
+                  {repliedMessageId === '' ? null : repliedMessage ? (
+                    <>
+                      <div className="flex justify-start text-gray-400">
+                        Replying to {repliedMessage.username}
+                      </div>
+                      <div className="flex justify-start">{repliedMessage.text}</div>
+                    </>
+                  ) : (
+                    <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
                   )}
                 </div>
+                {isEditingMessage ? (
+                  <div>
+                    <textarea
+                      id='edit-message'
+                      autoFocus
+                      onChange={(e) => {
+                        setEditMessageInputMessage(e.target.value)
+                      }}
+                      className="textarea w-full focus:outline-none border-0 focus:shadow-none shadow-none resize-none"
+                      value={editMessageInputMessage}
+                    />
+                    <p className="text-sm">
+                      Escape to <span className="text-accent">cancel</span>, enter to{' '}
+                      <span className="text-accent">save</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex justify-start">
+                    {msg.text}
+                  </div>
+                )}
+              </div>
+              {msg.isEdited && (
+                  <span
+                    className={`px-2 text-xs text-gray-300`}
+                  >
+                    (edited)
+                  </span>
               )}
             </div>
-          </div>
 
-          {isHovered && (
-            <div className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center">
-              <button
-                onMouseEnter={() => setHoveredIcon('react')}
-                onMouseLeave={() => setHoveredIcon(null)}
-                className={`cursor-pointer ${
-                  hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'
-                } rounded-md p-1`}
-              >
-                <ReactIcon iconColor="#fff" />
-              </button>
-              {userId == msg.senderId && (
+            {isHovered && (
+              <div className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center">
                 <button
-                  onClick={() => {
-                    handleEdit(msg); 
-                  }}
-                  onMouseEnter={() => setHoveredIcon('edit')}
+                  onMouseEnter={() => setHoveredIcon('react')}
                   onMouseLeave={() => setHoveredIcon(null)}
                   className={`cursor-pointer ${
-                    hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'
+                    hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'
                   } rounded-md p-1`}
                 >
-                  <EditIcon iconColor="#fff" />
+                  <ReactIcon iconColor="#fff" />
                 </button>
-              )}
-              <button
-                onClick={() => handleReply(msg)}
-                onMouseEnter={() => setHoveredIcon('reply')}
-                onMouseLeave={() => setHoveredIcon(null)}
-                className={`cursor-pointer ${
-                  hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'
-                } rounded-md p-1`}
-              >
-                <ReplyIcon iconColor="#fff" />
-              </button>
-              {userId == msg.senderId && (
+                {userId == msg.senderId && (
+                  <button
+                    onClick={() => {
+                      handleEdit(msg); 
+                      requestAnimationFrame(measure)
+                    }}
+                    onMouseEnter={() => setHoveredIcon('edit')}
+                    onMouseLeave={() => setHoveredIcon(null)}
+                    className={`cursor-pointer ${
+                      hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'
+                    } rounded-md p-1`}
+                  >
+                    <EditIcon iconColor="#fff" />
+                  </button>
+                )}
                 <button
-                  onClick={() => handleDeleteConfirmation(msg)}
-                  onMouseEnter={() => setHoveredIcon('delete')}
+                  onClick={() => handleReply(msg)}
+                  onMouseEnter={() => setHoveredIcon('reply')}
                   onMouseLeave={() => setHoveredIcon(null)}
                   className={`cursor-pointer ${
-                    hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'
+                    hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'
                   } rounded-md p-1`}
                 >
-                  <DeleteIcon iconColor="#D0021B" />
+                  <ReplyIcon iconColor="#fff" />
                 </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+                {userId == msg.senderId && (
+                  <button
+                    onClick={() => handleDeleteConfirmation(msg)}
+                    onMouseEnter={() => setHoveredIcon('delete')}
+                    onMouseLeave={() => setHoveredIcon(null)}
+                    className={`cursor-pointer ${
+                      hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'
+                    } rounded-md p-1`}
+                  >
+                    <DeleteIcon iconColor="#D0021B" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          )}}
     </CellMeasurer>
   )
 }
@@ -574,17 +587,26 @@ const handleScroll = useCallback(
           >
             Replying to {replyUsername}<button onClick={()=>setReplyMessage(null)}>X</button>
           </div>}
-        <input onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            handleSubmit();
-          }
-        }}
-        placeholder={'Type a message...'} 
-        value={inputMessage} 
-        onChange={(e)=>setInputMessage(e.target.value)} 
-        type="text" 
-        className="input input-md items-end w-full focus:outline-0 mt-2" 
-        ref={inputRef}/>
+        <textarea
+          id="chat-message"
+          rows={1}
+          placeholder="Type a message..."
+          value={inputMessage}
+          onChange={(e) => {
+            setInputMessage(e.target.value);
+            e.currentTarget.style.height = 'auto'; // Reset height
+            e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // Resize
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
+          ref={textareaRef}
+          className="textarea textarea-md w-full mt-2 resize-none overflow-hidden focus:outline-0 !min-h-0"
+        />
+
       </div>
       <dialog id="delete_confirmation_modal" className="modal">
         <div className="modal-box">
