@@ -1,8 +1,9 @@
-import { ref, onValue, onDisconnect, set, serverTimestamp } from "firebase/database";
+import { ref, onValue, onDisconnect, set, serverTimestamp, off } from "firebase/database";
 import { useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { User } from 'firebase/auth'
 import { rtdb } from "../config/firebase";
+import type { DataSnapshot } from "firebase/database";
 
 const usePresence = (user: User | null)=>{
 
@@ -11,7 +12,8 @@ const usePresence = (user: User | null)=>{
 
     const userId = user.uid;
 
-    let sessionId = sessionStorage.getItem('firebaseSessionId');
+    let sessionId = sessionStorage.getItem('firebaseSessionId'); 
+    
     if (!sessionId) {
       sessionId = uuidv4();
       sessionStorage.setItem('firebaseSessionId', sessionId);
@@ -31,20 +33,20 @@ const usePresence = (user: User | null)=>{
 
     const connectedRef = ref(rtdb, '.info/connected');
 
-    const unsubscribe = onValue(connectedRef, (snapshot) => {
-        if (snapshot.val() === false) {
-            // Client is offline
-            return;
-        }
+    const handleConnectionChange = (snapshot: DataSnapshot) => {
+      if (snapshot.val() === false) {
+        return;
+      }
 
-        onDisconnect(userStatusRef).set(isOffline).catch(console.error)
+      onDisconnect(userStatusRef).set(isOffline).catch(console.error);
+      set(userStatusRef, isOnline).catch(console.error);
+    };
 
-        set(userStatusRef, isOnline).catch(console.error);
-    });
+    onValue(connectedRef, handleConnectionChange)
 
     // Cleanup on unmount: mark offline
     return () => {
-        unsubscribe();
+        off(connectedRef, 'value', handleConnectionChange);
         set(userStatusRef, isOffline).catch(console.error);
     };
   }, [user]);

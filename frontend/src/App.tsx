@@ -8,6 +8,9 @@ import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from
 import type { User } from 'firebase/auth'
 import usePresence from './hooks/usePresence'
 import { Toaster } from 'sonner'
+import { ref, serverTimestamp, set } from 'firebase/database';
+import { rtdb } from './config/firebase';
+import useSummaryStatus from './hooks/useSummaryStatus';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -41,10 +44,24 @@ function App() {
   }, [])
   
   usePresence(user);
+  useSummaryStatus(user);
 
   const logOut = async () => {
-    await signOut(auth);
+    const user = auth.currentUser;
+    const sessionId = sessionStorage.getItem('firebaseSessionId');
+
     setUser(null);
+    if (user && sessionId) {
+      const userStatusRef = ref(rtdb, `status/${user.uid}/${sessionId}`);
+
+      // Set user offline explicitly
+      await set(userStatusRef, {
+        state: 'offline',
+        last_changed: serverTimestamp(),
+      });
+    }
+
+    await signOut(auth);
   };
 
   return (

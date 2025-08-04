@@ -9,6 +9,7 @@ class UserController{
             uid: req.body.uid,
             email: req.body.email,
             createdAt: serverTimestamp(),
+            isOnline: true
         }
         try{
             UserSchema.parse(user);
@@ -106,9 +107,65 @@ class UserController{
                 res.status(404).json({status: 'Failed', message: 'User not found'})
                 return
             }
+
+            const data = docSnap.data()
+
             await updateDoc(docRef, {
                 isOnline: updatedFields.isOnline,
-                username: updatedFields.username || docSnap.data().username
+                username: updatedFields.username || data.username,
+                updatedAt: serverTimestamp()
+            })
+            res.status(200).json({status: 'Success', message: 'User updated'})
+        }catch(e){
+            res.status(500).json({status: 'Failure', message: 'Failed to update user', error: e instanceof Error ? e.message : e})
+        }
+    }
+
+    async updateStatusOffline(req, res){
+        const { uid } = req.body
+
+        const queryRef = query(collection(db, 'users'), where('uid', '==', uid))
+
+        try{
+            const querySnap = await getDocs(queryRef)
+
+            if(querySnap.empty){
+                res.status(404).json({status: 'Failed', message: 'User not found'})
+                return
+            }
+            
+            const firstSnap = querySnap.docs[0]
+            const docRef = firstSnap.ref
+
+            await updateDoc(docRef, {
+                isOnline: false,
+                updatedAt: serverTimestamp()
+            })
+            res.status(200).json({status: 'Success', message: 'User updated'})
+        }catch(e){
+            res.status(500).json({status: 'Failure', message: 'Failed to update user', error: e instanceof Error ? e.message : e})
+        }
+    }
+
+     async updateStatusOnline(req, res){
+        const { uid } = req.body
+
+        const queryRef = query(collection(db, 'users'), where('uid', '==', uid))
+
+        try{
+            const querySnap = await getDocs(queryRef)
+
+            if(querySnap.empty){
+                res.status(404).json({status: 'Failed', message: 'User not found'})
+                return
+            }
+            
+            const firstSnap = querySnap.docs[0]
+            const docRef = firstSnap.ref
+
+            await updateDoc(docRef, {
+                isOnline: true,
+                updatedAt: serverTimestamp()
             })
             res.status(200).json({status: 'Success', message: 'User updated'})
         }catch(e){

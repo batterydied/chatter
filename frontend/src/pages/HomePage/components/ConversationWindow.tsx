@@ -61,12 +61,12 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
   const textareaElRef = useRef<HTMLTextAreaElement | null>(null)
   const listRef = useRef<List>(null)
-  const measureRef = useRef<(() => void) | null>(null)
-
 
   const textareaRef = useCallback((ele: HTMLTextAreaElement | null) => {
     if(ele){
       textareaElRef.current = ele;
+      const len = ele.value.length
+      ele.setSelectionRange(len, len)
       ele.focus();
     }
   }, []);
@@ -172,7 +172,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     textareaElRef.current?.focus();
   }
 
-  const handleUpdate = useCallback((msg: SerializedMessage, updatedMsg: string) => {
+  const handleUpdate = useCallback(async (msg: SerializedMessage, updatedMsg: string) => {
     const sendUpdate = async (msgId: string, updatedMsg: string) => {
       try{
         await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/${msgId}`, 
@@ -193,7 +193,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       handleDeleteConfirmation(msg)
     }
     else if(msg.text !== updatedMsg){
-      sendUpdate(msg.id, updatedMsg)
+      await sendUpdate(msg.id, updatedMsg)
     }
 
     setEditMessage(null)
@@ -311,8 +311,7 @@ const handleScroll = useCallback(
       columnIndex={0}
       rowIndex={index}
     >
-      {({ measure }) => {
-        measureRef.current = measure
+      {() => {
         return (
           <div
             style={style}
@@ -324,72 +323,74 @@ const handleScroll = useCallback(
               handleSelectHoverId(msg.id)
             }}
           >
-            <div
-              className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
-                isReply && isHovered
-                  ? 'bg-blue-900'
-                  : isReply
-                  ? 'bg-blue-950'
-                  : isHovered
-                  ? 'bg-base-200'
-                  : 'bg-base-300'
-              } relative text-left whitespace-normal`}
-            >
-              <div className="chat-image avatar">
-                <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
-                  <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
-                </div>
-              </div>
-              {!isGrouped && (
-                <div className="chat-header">
-                  <p>{msg.username}</p>
-                  <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-                </div>
-              )}
-              <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-                <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
-                  {repliedMessageId === '' ? null : repliedMessage ? (
-                    <>
-                      <div className="flex justify-start text-gray-400">
-                        Replying to {repliedMessage.username}
-                      </div>
-                      <div className="flex justify-start">{repliedMessage.text}</div>
-                    </>
-                  ) : (
-                    <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
-                  )}
-                </div>
-                {isEditingMessage ? (
-                  <div>
-                    <textarea
-                      id='edit-message'
-                      autoFocus
-                      onChange={(e) => {
-                        setEditMessageInputMessage(e.target.value)
-                      }}
-                      className="textarea w-full focus:outline-none border-0 focus:shadow-none shadow-none resize-none"
-                      value={editMessageInputMessage}
-                    />
-                    <p className="text-sm">
-                      Escape to <span className="text-accent">cancel</span>, enter to{' '}
-                      <span className="text-accent">save</span>
-                    </p>
+            <div>
+              <div
+                className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
+                  isReply && isHovered
+                    ? 'bg-blue-900'
+                    : isReply
+                    ? 'bg-blue-950'
+                    : isHovered
+                    ? 'bg-base-200'
+                    : 'bg-base-300'
+                } relative text-left whitespace-normal`}
+              >
+                <div className="chat-image avatar">
+                  <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
+                    <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
                   </div>
-                ) : (
-                  <div className="flex justify-start">
-                    {msg.text}
+                </div>
+                {!isGrouped && (
+                  <div className="chat-header">
+                    <p>{msg.username}</p>
+                    <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
                   </div>
                 )}
+                <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+                  <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
+                    {repliedMessageId === '' ? null : repliedMessage ? (
+                      <>
+                        <div className="flex justify-start text-gray-400">
+                          Replying to {repliedMessage.username}
+                        </div>
+                        <div className="flex justify-start">{repliedMessage.text}</div>
+                      </>
+                    ) : (
+                      <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
+                    )}
+                  </div>
+                  {isEditingMessage ? (
+                    <div>
+                      <textarea
+                        id='edit-message'
+                        ref={textareaRef}
+                        onChange={(e) => {
+                          setEditMessageInputMessage(e.target.value)
+                        }}
+                        className="textarea w-full focus:outline-none border-0 focus:shadow-none shadow-none resize-none"
+                        value={editMessageInputMessage}
+                      />
+                      <p className="text-sm">
+                        Escape to <span className="text-accent">cancel</span>, enter to{' '}
+                        <span className="text-accent">save</span>
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex justify-start">
+                      {msg.text}
+                    </div>
+                  )}
+                </div>
               </div>
               {msg.isEdited && (
                   <span
-                    className={`px-2 text-xs text-gray-300`}
+                    className={`text-xs text-accent flex w-full ${isUser ? 'justify-end': 'justify-start'}`}
                   >
                     (edited)
                   </span>
               )}
             </div>
-
+            
             {isHovered && (
               <div className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center">
                 <button
@@ -405,7 +406,7 @@ const handleScroll = useCallback(
                   <button
                     onClick={() => {
                       handleEdit(msg)
-                      requestAnimationFrame(measure)
+                      forceRemeasure(cellMeasurerCache, listRef)
                     }}
                     onMouseEnter={() => setHoveredIcon('edit')}
                     onMouseLeave={() => setHoveredIcon(null)}

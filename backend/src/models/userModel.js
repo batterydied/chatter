@@ -4,7 +4,8 @@ const UserSchema = z.object({
     username: z.string(),
     email: z.string().email(),
     createdAt: z.any().optional(),
-    uid: z.string()
+    uid: z.string(),
+    isOnline: z.boolean()
 })
 
 export default UserSchema

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { doc, getDoc, query, collection, where, getDocs } from 'firebase/firestore'
+import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
 
 type FriendListProps = {
     userId: string,
@@ -24,9 +25,12 @@ export type Friend = {
 const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [friends, setFriends] = useState<Friend[]>([])
     const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
-    const [selectedOnline, setSelectedOnline] = useState<boolean>(true)
+    const [selectedOnline, setSelectedOnline] = useState<boolean>(false)
     const onlineFriendRef = useRef<HTMLButtonElement>(null)
     const allFriendRef = useRef<HTMLButtonElement>(null)
+
+    const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
+    const listRef = useRef<List>(null)
 
     const handleOnlineFriends = ()=>{
         setSelectedOnline(true)
@@ -60,12 +64,23 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         }
         retrieveFriends()
     }, [userId])
-    const renderFriends = (friends: Friend[]) => {
-        return friends.map((f) => (
-            <li onClick={async ()=> await openConversation(f.friendId, userId)} className='rounded-none list-row border-b border-b-base-100 cursor-pointer hover:bg-neutral hover:rounded-xl' key={f.relationshipId}>
-                <p>{f.username}</p>
-            </li>
-        ));
+    const renderFriends: ListRowRenderer = ({ index, key, parent, style }) => {
+        const friend = friends[index]
+        return (
+            <CellMeasurer
+                key={key}
+                cache={cellMeasurerCache.current}
+                parent={parent}
+                columnIndex={0}
+                rowIndex={index}
+            >
+                {()=>
+                <div style={style} onClick={async ()=> await openConversation(friend.friendId, userId)} className='rounded-none list-row border-b border-b-base-100 cursor-pointer hover:bg-neutral hover:rounded-xl'>
+                    <p>{friend.username}</p>
+                </div>
+                }
+            </CellMeasurer>
+        )
     };
 
     const openConversation = async (userId1: string, userId2: string) => {
@@ -91,11 +106,10 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 console.log('Unknown error occurred')
             }
         }
-
     }
     return (
-        <ul className='list justify-start'>
-            <li className='mb-2 border-b border-base-100 pb-2'>
+        <div className='list justify-start'>
+            <div className='mb-2 border-b border-base-100 pb-2'>
                 <div className='flex items-start space-x-2'>
                     <button className='btn pointer-events-none cursor-default bg-base-300 border-none shadow-none'>
                         <span>Friends</span>
@@ -104,9 +118,21 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     <button ref={allFriendRef} className='btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:border-base-accent focus:bg-base-100' onClick={handleAllFriends}>All</button>
                     <button className='btn bg-primary border-none hover:opacity-80 rounded-lg'>Add Friend</button>
                 </div>
-            </li>
-            {renderFriends(friends)}
-        </ul>
+            </div>
+            <AutoSizer>
+                {({width, height})=>
+                    <List
+                    width={width}
+                    height={height}
+                    rowHeight={cellMeasurerCache.current.rowHeight}
+                    deferredMeasurementCache={cellMeasurerCache.current}
+                    rowCount={friends.length}
+                    rowRenderer={renderFriends}
+                    ref={listRef}
+                    />
+                }
+            </AutoSizer>
+        </div>
     )
 
 }

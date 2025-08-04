@@ -3,8 +3,11 @@ import UserController from '../controllers/userControllers.js'
 
 const router = express.Router()
 
-router.post('/:id', UserController.updateUserById)
+router.post('/offline', UserController.updateStatusOffline)
 
+router.post('/online', UserController.updateStatusOnline)
+
+router.post('/:id', UserController.updateUserById)
 
 router.post('/', UserController.createUser)
 
