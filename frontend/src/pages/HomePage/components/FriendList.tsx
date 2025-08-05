@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { doc, getDoc, query, collection, where, getDocs } from 'firebase/firestore'
+import { doc, getDoc, query, collection, where, getDocs, onSnapshot } from 'firebase/firestore'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
 
 type FriendListProps = {
@@ -31,6 +31,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
     const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const listRef = useRef<List>(null)
+    const friendDict = useRef<Record<string, ()=>void>>({})
 
     const handleOnlineFriends = ()=>{
         setSelectedOnline(true)
@@ -82,6 +83,43 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             </CellMeasurer>
         )
     };
+
+    useEffect(()=>{
+        friends.forEach((friend)=>{
+            if(friend.friendId in friendDict){
+                return
+            }
+
+            const friendRef = doc(db, 'users',  friend.friendId);
+            const unsub = onSnapshot(friendRef, async (snapshot)=>{
+                if (!snapshot.exists()) return;
+                
+                const [serializedFriend] = (await serializeFriends([{
+                    id: friend.relationshipId,
+                    data: {
+                        from: friend.friendId
+                    }
+                }]))
+                
+                if(serializedFriend){
+                    setFriends((prev)=>
+                    prev.map((f)=>(f.friendId === friend.friendId ? serializedFriend : f))
+                )}
+                else{
+                    setFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
+                }
+                
+            })
+            friendDict.current[friend.friendId] = unsub
+        })
+    }, [friends])
+
+    useEffect(()=>{
+        for (const key in friendDict.current) {
+            friendDict.current[key]()
+        }
+        friendDict.current = {}
+    }, [userId])
 
     const openConversation = async (userId1: string, userId2: string) => {
         const queryRef = query(collection(db, 'conversations'), where('directConversationId', '==', [userId1, userId2].sort().join('_')))

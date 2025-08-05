@@ -61,6 +61,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
   const textareaElRef = useRef<HTMLTextAreaElement | null>(null)
   const listRef = useRef<List>(null)
+  const measureRef = useRef<(() => void) | null>(null)
 
   const textareaRef = useCallback((ele: HTMLTextAreaElement | null) => {
     if(ele){
@@ -311,7 +312,8 @@ const handleScroll = useCallback(
       columnIndex={0}
       rowIndex={index}
     >
-      {() => {
+      {({measure}) => {
+        measureRef.current = measure
         return (
           <div
             style={style}
@@ -376,7 +378,7 @@ const handleScroll = useCallback(
                       </p>
                     </div>
                   ) : (
-                    <div className="flex justify-start">
+                    <div className="break-words whitespace-normal">
                       {msg.text}
                     </div>
                   )}
@@ -468,22 +470,27 @@ const handleScroll = useCallback(
     if(shouldScrollToBottom && messages.length > 0){
       listRef.current?.scrollToRow(messages.length - 1)
       requestAnimationFrame(() => {
-        setShouldScrollToBottom(false)
-        setInitialScrollDone(true)
+        requestAnimationFrame(()=>{
+          setShouldScrollToBottom(false)
+          setInitialScrollDone(true)
+        })
       })
     }
   }, [shouldScrollToBottom, messages])
 
-
   useEffect(() => {
     messages.forEach((msg) => {
-      if(msg.senderId === userId){
+      if(msg.senderId === userId || msg.id in subscriptionDict.current){
         return
       }
       const msgRef = doc(db, 'conversations', conversationId, 'messages', msg.id);
 
       const unsub = onSnapshot(msgRef, async (snapshot) => {
-        if (!snapshot.exists()) return;
+        if (!snapshot.exists()){ 
+          setMessages((prev)=>prev.filter((m)=>m.id !== msg.id))
+          forceRemeasure(cellMeasurerCache, listRef)
+          return;
+        }
 
         const data = snapshot.data();
         const [serialized] = await serializeMessages([{
@@ -497,13 +504,30 @@ const handleScroll = useCallback(
           replyId: data.replyId,
         }], db);
 
-        if(!(msg.id in subscriptionDict.current)){
-          subscriptionDict.current[msg.id] = unsub
-        }
+        subscriptionDict.current[msg.id] = unsub
 
-        setMessages((prev) =>
-          prev.map((m) => (m.id !== serialized.id ? m : serialized))
-        );
+        setMessages((prev) => {
+          let updated = false;
+          const newMessages = prev.map((m) => {
+            if (m.id !== serialized.id) return m;
+
+            // Only update if text or isEdited (or other fields you care about) changed
+            if (
+              m.text !== serialized.text ||
+              m.isEdited !== serialized.isEdited ||
+              m.senderId !== serialized.senderId || // if needed
+              m.replyId !== serialized.replyId
+              // add more fields to compare if relevant
+            ) {
+              updated = true;
+              return serialized;
+            }
+            return m;
+          });
+
+          return updated ? newMessages : prev; // return old array if no update
+        });
+        forceRemeasure(cellMeasurerCache, listRef)
       });
     });
 
@@ -611,7 +635,7 @@ const handleScroll = useCallback(
             }
           }}
           ref={textareaRef}
-          className="textarea textarea-md w-full mt-2 resize-none overflow-hidden focus:outline-0 !min-h-0"
+          className="textarea textarea-md w-full mt-2 resize-none overflow-auto focus:outline-0 !min-h-0"
         />
 
       </div>
