@@ -3,6 +3,9 @@ import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { doc, getDoc, query, collection, where, getDocs, onSnapshot } from 'firebase/firestore'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
+import { RemoveUserIcon } from "../../../assets/icons"
+import { toast } from "sonner"
+import forceRemeasure from "../../../utils/forceRemeasure"
 
 type FriendListProps = {
     userId: string,
@@ -28,6 +31,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [selectedOnline, setSelectedOnline] = useState<boolean>(false)
     const onlineFriendRef = useRef<HTMLButtonElement>(null)
     const allFriendRef = useRef<HTMLButtonElement>(null)
+    const [removeFriend, setRemoveFriend] = useState<Friend | null>(null)
 
     const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const listRef = useRef<List>(null)
@@ -65,6 +69,27 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         }
         retrieveFriends()
     }, [userId])
+
+    const handleRemoveConfirmation = (friend: Friend) => {
+        setRemoveFriend(friend);
+        (document.getElementById('remove_confirmation_modal') as HTMLDialogElement)!.showModal();
+    }
+
+    const sendRemove = async (friendId: string) => {
+        try{
+            await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/relation/delete-friend`, {
+                data: {
+                    from: userId,
+                    to: friendId
+                }
+            })
+            setFriends((prev) => prev.filter((f) => f.friendId != friendId))
+            setRemoveFriend(null)
+            forceRemeasure(cellMeasurerCache, listRef)
+        }catch{
+            toast.error('Could not remove friend, try again later.')
+        }
+    }
     const renderFriends: ListRowRenderer = ({ index, key, parent, style }) => {
         const friend = friends[index]
         return (
@@ -76,8 +101,17 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 rowIndex={index}
             >
                 {()=>
-                <div style={style} onClick={async ()=> await openConversation(friend.friendId, userId)} className='rounded-none list-row border-b border-b-base-100 cursor-pointer hover:bg-neutral hover:rounded-xl'>
-                    <p>{friend.username}</p>
+                <div style={style} className='relative'>
+                    <div onClick={async ()=> await openConversation(friend.friendId, userId)} className='rounded-none list-row cursor-pointer hover:bg-neutral hover:rounded-xl flex justify-start items-center overflow-hidden'>
+                        <img className="w-10 rounded-full" src="https://img.daisyui.com/images/profile/demo/anakeen@192.webp" />
+                        <p>{friend.username}</p>
+                        <div className='ml-auto hover:bg-base-300 rounded-full p-2' onClick={(e)=>{
+                            e.stopPropagation()
+                            handleRemoveConfirmation(friend)
+                        }}>
+                            <RemoveUserIcon iconColor={'red'}/>
+                        </div>
+                    </div>
                 </div>
                 }
             </CellMeasurer>
@@ -92,7 +126,10 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
             const friendRef = doc(db, 'users',  friend.friendId);
             const unsub = onSnapshot(friendRef, async (snapshot)=>{
-                if (!snapshot.exists()) return;
+                if (!snapshot.exists()){
+                    setFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
+                    return
+                }
                 
                 const [serializedFriend] = (await serializeFriends([{
                     id: friend.relationshipId,
@@ -146,7 +183,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         }
     }
     return (
-        <div className='list justify-start'>
+        <div className='list justify-start h-full overflow-hidden'>
             <div className='mb-2 border-b border-base-100 pb-2'>
                 <div className='flex items-start space-x-2'>
                     <button className='btn pointer-events-none cursor-default bg-base-300 border-none shadow-none'>
@@ -160,16 +197,29 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             <AutoSizer>
                 {({width, height})=>
                     <List
-                    width={width}
-                    height={height}
-                    rowHeight={cellMeasurerCache.current.rowHeight}
-                    deferredMeasurementCache={cellMeasurerCache.current}
-                    rowCount={friends.length}
-                    rowRenderer={renderFriends}
-                    ref={listRef}
+                        width={width}
+                        height={height}
+                        rowHeight={cellMeasurerCache.current.rowHeight}
+                        deferredMeasurementCache={cellMeasurerCache.current}
+                        rowCount={friends.length}
+                        rowRenderer={renderFriends}
+                        ref={listRef}
                     />
                 }
             </AutoSizer>
+            <dialog id="remove_confirmation_modal" className="modal">
+                <div className="modal-box pb-12">
+                    <form method="dialog">
+                        {/* if there is a button in form, it will close the modal */}
+                        <div className='absolute bottom-2 right-4'>
+                            <button className="btn btn-sm bg-gray-500 mr-2 hover:!border-gray-500 hover:bg-gray-600" onClick={()=>setRemoveFriend(null)}>Cancel</button>
+                            <button className="btn btn-sm bg-red-500 hover:!border-red-500 hover:bg-red-600" onClick={()=>sendRemove(removeFriend!.friendId)}>Remove Friend</button>
+                        </div>
+                    </form>
+                    <h3 className="font-bold text-lg">Remove '{removeFriend?.username}'</h3>
+                    <h3 className="text-md">Are you sure you want to remove {removeFriend?.username} from your friends?</h3>
+                </div>
+            </dialog>
         </div>
     )
 

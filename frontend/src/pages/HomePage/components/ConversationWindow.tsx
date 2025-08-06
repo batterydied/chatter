@@ -152,6 +152,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     try{
       await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/${msgId}`)
       setMessages((prev) => prev.filter((m) => m.id !== msgId))
+      setDeleteMessage(null)
       forceRemeasure(cellMeasurerCache, listRef)
     }catch{
       toast.error('Could not delete message, try again later.')
@@ -505,9 +506,8 @@ const handleScroll = useCallback(
         }], db);
 
         subscriptionDict.current[msg.id] = unsub
-
+        let updated = false
         setMessages((prev) => {
-          let updated = false;
           const newMessages = prev.map((m) => {
             if (m.id !== serialized.id) return m;
 
@@ -524,10 +524,10 @@ const handleScroll = useCallback(
             }
             return m;
           });
-
-          return updated ? newMessages : prev; // return old array if no update
+          return newMessages
         });
-        forceRemeasure(cellMeasurerCache, listRef)
+
+        if(updated) forceRemeasure(cellMeasurerCache, listRef)
       });
     });
 
