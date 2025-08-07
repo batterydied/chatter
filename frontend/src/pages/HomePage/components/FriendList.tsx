@@ -32,6 +32,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const onlineFriendRef = useRef<HTMLButtonElement>(null)
     const allFriendRef = useRef<HTMLButtonElement>(null)
     const [removeFriend, setRemoveFriend] = useState<Friend | null>(null)
+    const [searchId, setSearchId] = useState<string>('')
+    const [successRequestMessage, setSuccessRequestMessage] = useState(false)
 
     const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const listRef = useRef<List>(null)
@@ -73,6 +75,27 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const handleRemoveConfirmation = (friend: Friend) => {
         setRemoveFriend(friend);
         (document.getElementById('remove_confirmation_modal') as HTMLDialogElement)!.showModal();
+    }
+
+    const handleAddFriend = () => {
+        (document.getElementById('add_friend_modal') as HTMLDialogElement)!.showModal();
+    }
+
+    const sendRequest = async () => {
+        try{
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/friend-request`, {
+                from: userId,
+                to: searchId
+            })
+            setSuccessRequestMessage(true)
+            setSearchId('')
+        }catch{
+            toast.error('Could not send friend request, try again later.')
+        }
+    }
+
+    const isValidSearchId = (searchId: string) => {
+        return searchId.length === 20
     }
 
     const sendRemove = async (friendId: string) => {
@@ -184,14 +207,11 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     }
     return (
         <div className='list justify-start h-full overflow-hidden'>
-            <div className='mb-2 border-b border-base-100 pb-2'>
+            <div className='mb-2 border-b border-gray-700 pb-2'>
                 <div className='flex items-start space-x-2'>
-                    <button className='btn pointer-events-none cursor-default bg-base-300 border-none shadow-none'>
-                        <span>Friends</span>
-                    </button>
-                    <button ref={onlineFriendRef} className='btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:border-base-accent focus:bg-base-100' onClick={handleOnlineFriends}>Online</button>
-                    <button ref={allFriendRef} className='btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:border-base-accent focus:bg-base-100' onClick={handleAllFriends}>All</button>
-                    <button className='btn bg-primary border-none hover:opacity-80 rounded-lg'>Add Friend</button>
+                    <button ref={onlineFriendRef} className='btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none focus:bg-base-100' onClick={handleOnlineFriends}>Online</button>
+                    <button ref={allFriendRef} className='btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:bg-base-100 hover:border-none focus:bg-base-100' onClick={handleAllFriends}>All</button>
+                    <button className='btn bg-primary rounded-lg' onClick={handleAddFriend}>Add Friend</button>
                 </div>
             </div>
             <AutoSizer>
@@ -218,6 +238,23 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     </form>
                     <h3 className="font-bold text-lg">Remove '{removeFriend?.username}'</h3>
                     <h3 className="text-md">Are you sure you want to remove {removeFriend?.username} from your friends?</h3>
+                </div>
+            </dialog>
+
+            <dialog id="add_friend_modal" className="modal">
+                <div className="modal-box">
+                    <form method="dialog">
+                    {/* if there is a button in form, it will close the modal */}
+                    <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" 
+                        onClick={()=>{
+                            setSearchId('')
+                            setSuccessRequestMessage(false)
+                        }}>✕</button>
+                    <h3 className="font-bold text-lg">Add Friend</h3>
+                    <input type="text" onChange={(e)=>setSearchId(e.target.value)} value={searchId} placeholder="Enter user ID: " className="input my-2"/>
+                    </form>
+                    <button onClick={sendRequest} className={`btn btn-primary ${!isValidSearchId(searchId) && 'pointer-events-none opacity-50'}`}>Send Friend Request</button>
+                    {successRequestMessage && <div className='text-green-400 m-2'>Friend request sent successfully!</div>}
                 </div>
             </dialog>
         </div>
