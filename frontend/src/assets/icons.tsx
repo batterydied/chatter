@@ -70,3 +70,19 @@ export const RequestIcon = ({iconColor='#000000'}: iconProps) => {
         </svg>
     )
 }
+
+export const CheckIcon = ({iconColor='#000000'}: iconProps) => {
+    return (
+       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color={iconColor} fill="none">
+            <path d="M5 14.5C5 14.5 6.5 14.5 8.5 18C8.5 18 14.0588 8.83333 19 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
+        </svg>
+    )
+}
+
+export const XIcon = ({iconColor='#000000'}: iconProps) => {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color={iconColor} fill="none">
+            <path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
+        </svg>
+    )
+}

@@ -1,14 +1,15 @@
 import type { User } from 'firebase/auth'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchUserFromDB, subscribeConversation, renderConversations } from './homePageHelpers'
 import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
-import { RequestIcon, UserIcon } from '../../assets/icons'
-import { collection, DocumentSnapshot, onSnapshot, query, where } from 'firebase/firestore'
+import { CheckIcon, RequestIcon, UserIcon, XIcon } from '../../assets/icons'
+import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, deleteDoc, writeBatch } from 'firebase/firestore'
 import { db } from '../../config/firebase'
+import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
 
 type HomeProps = {
     user: User | null
@@ -16,7 +17,8 @@ type HomeProps = {
 }
 
 type FriendRequest = {
-    from: string
+    from: string,
+    username: string
 }
 
 const HomePage = ({user, logOut} : HomeProps) => {
@@ -26,6 +28,10 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [loading, setLoading] = useState(true)
     const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
+    const [modalOpen, setModalOpen] = useState(false)
+    const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
+    const listRef = useRef<List>(null)
+
     const navigate = useNavigate();
 
     useEffect(()=>{
@@ -41,6 +47,28 @@ const HomePage = ({user, logOut} : HomeProps) => {
         }
     }, [user, navigate])
 
+    const handleSetFriendRequests = async (docs: DocumentSnapshot[]) => {
+        const results = await Promise.all(
+            docs.map(async (reqDoc) => {
+                const data = reqDoc.data() as FriendRequest | undefined;
+                if (!data) return null;
+
+                const docRef = doc(db, "users", data.from);
+                const userSnapshot = await getDoc(docRef);
+                if (!userSnapshot.exists()) return null;
+
+                const userData = userSnapshot.data();
+                return {
+                    from: data.from,
+                    username: userData.username,
+                };
+            })
+        );
+    const filtered = results.filter((r): r is FriendRequest => r !== null)
+    setFriendRequests(filtered)
+};
+
+
     useEffect(()=>{
         if(!appUser) return
         const queryRef = query(collection(db, "relations"),
@@ -48,19 +76,90 @@ const HomePage = ({user, logOut} : HomeProps) => {
         where("status", "==", "pending"))
 
         const unsub = onSnapshot(queryRef, (snapshot)=>{
-            const serializedFriendRequests = serializeFriendRequests(snapshot.docs)
-            setFriendRequests(serializedFriendRequests)
+            handleSetFriendRequests(snapshot.docs)
         })
 
         return unsub
     }, [appUser])
+/*
+    useEffect(() => {
+        if (!modalOpen || !appUser) return;
 
+        const queryRef = query(
+            collection(db, "relations"),
+            where("to", "==", appUser.id),
+            where("status", "==", "pending")
+        );
+
+        getDocs(queryRef).then(snapshot => {
+            handleSetFriendRequests(snapshot.docs);
+        });
+    }, [modalOpen]);
+    */
     useEffect(()=>{
         if(appUser){
             const unsub = subscribeConversation(appUser.id, setRecentConversations, setLoading)
             return unsub
         }
     }, [appUser])
+
+    const handleDeclineAll = async () => {
+        if(!appUser) return
+        const queryRef = query(collection(db, 'relations'), 
+        where("to", "==", appUser.id),
+        where("status", "==", "pending"))
+
+        const snapshots = await getDocs(queryRef)
+
+        if(snapshots.empty) return
+        const snapshot = await getDocs(queryRef);
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        
+        await batch.commit();
+    }
+    const renderRequests: ListRowRenderer= ({ index, key, parent, style }) => {
+        const request = friendRequests[index]
+        return (
+            <CellMeasurer
+              key={key}
+              cache={cellMeasurerCache.current}
+              parent={parent}
+              columnIndex={0}
+              rowIndex={index}
+            >
+                {()=>{
+                    return (
+                        <div style={style}>
+                            <div className='p-2 hover:bg-base-200 flex justify-between'>
+                                <div className='flex flex-col items-start'>
+                                    <div>
+                                        {request.username}
+                                    </div>
+                                    <div className='text-xs'>
+                                        {request.from}
+                                    </div>
+                                </div>
+                                <div className='flex items-center'>
+                                    <div className='w-[30px] h-[30px] rounded-full bg-green-600 mr-6 hover:cursor-pointer hover:bg-green-700 active:bg-green-800 flex justify-center items-center'>
+                                        <div>
+                                            <CheckIcon iconColor='black'/>
+                                        </div>
+                                    </div>
+                                    <div className='w-[30px] h-[30px] rounded-full bg-red-600 hover:cursor-pointer hover:bg-red-700 active:bg-red-800 flex justify-center items-center'>
+                                        <div>
+                                            <XIcon iconColor='black' />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }}
+            </CellMeasurer>
+        )
+
+    }
 
     if(loading){
         return (
@@ -72,19 +171,6 @@ const HomePage = ({user, logOut} : HomeProps) => {
 
     const handleOpenRequest = () => {
         (document.getElementById('request_modal') as HTMLDialogElement)!.showModal();
-    }
-
-    const serializeFriendRequests = (docs: DocumentSnapshot[]) => {
-        return docs
-        .map((doc) => {
-        const data = doc.data() as FriendRequest | undefined;
-        if (!data) return null;
-        return {
-            from: data.from,
-            // other fields if needed
-        };
-        })
-        .filter((r): r is FriendRequest => r !== null); // filter out nulls safely
     }
 
     return (
@@ -142,8 +228,31 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                     {/* if there is a button in form, it will close the modal */}
                                     <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
                                     <h3 className="font-bold text-lg">Requests</h3>
-                                    {friendRequests.length === 0 && <h3>There are no pending requests.</h3>}
+                                    {friendRequests.length === 0 ?  <h3>There are no pending requests.</h3> :
+                                    <div className='h-64'>
+                                        <AutoSizer>
+                                            {({width, height})=>
+                                            <List
+                                                width={width}
+                                                height={height}
+                                                rowHeight={cellMeasurerCache.current.rowHeight}
+                                                deferredMeasurementCache={cellMeasurerCache.current}
+                                                rowCount={friendRequests.length}
+                                                rowRenderer={renderRequests}
+                                                ref={listRef}
+                                            />
+                                            }           
+                                        </AutoSizer>
+                                    </div>
+                                    }
                                 </form>
+                                {friendRequests.length !== 0 &&
+                                <div className='mt-2 flex justify-end'>
+                                    <button className='btn bg-red-500' onClick={handleDeclineAll}>
+                                        Decline All
+                                    </button>
+                                </div>
+                                }
                             </div>
                         </dialog>
                     </div>
