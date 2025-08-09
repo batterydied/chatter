@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { doc, getDoc, query, collection, where, getDocs, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or } from 'firebase/firestore'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
 import { RemoveUserIcon } from "../../../assets/icons"
 import { toast } from "sonner"
@@ -34,6 +34,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [removeFriend, setRemoveFriend] = useState<Friend | null>(null)
     const [searchId, setSearchId] = useState<string>('')
     const [successRequestMessage, setSuccessRequestMessage] = useState(false)
+    const [errorMessage, setErrorMessage] = useState('')
 
     const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const listRef = useRef<List>(null)
@@ -81,17 +82,70 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         (document.getElementById('add_friend_modal') as HTMLDialogElement)!.showModal();
     }
 
+    const validateRequest = async () => {
+        if(searchId == userId){
+            setErrorMessage("You can't add yourself.")
+            return false
+        }
+        const userSnapshot = await getDoc(doc(db, 'users', searchId))
+        if(!userSnapshot.exists()){
+            setErrorMessage("User doesn't exist.")
+            setSuccessRequestMessage(false)
+            return false
+        }
+        const queryRef = query(
+            collection(db, 'relations'), 
+            or(
+                and(where("to", "==", searchId), where("from", "==", userId)),
+                and(where("to", "==", userId), where("from", "==", searchId))
+            )
+        )
+        const snapshot = await getDocs(queryRef)
+
+        if(snapshot.empty){
+            return true
+        }
+        for(const doc of snapshot.docs){
+            if(doc.data().status === 'friend'){
+                setErrorMessage("You're already friend with that user.")
+            }
+            else if(doc.data().status === 'pending'){
+                setErrorMessage("There's a pending request already.")
+            }
+            else{
+                setErrorMessage("You can't send a request to that user.")
+            }
+
+        }
+
+        setSuccessRequestMessage(false)
+        return false
+    }
+
     const sendRequest = async () => {
         try{
             await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/friend-request`, {
                 from: userId,
                 to: searchId
             })
+            setErrorMessage('')
             setSuccessRequestMessage(true)
             setSearchId('')
         }catch{
-            toast.error('Could not send friend request, try again later.')
+            toast.error('Could not send friend request, check the user ID.')
         }
+    }
+
+    const handleSend = async () => {
+        if(await validateRequest()){
+            sendRequest()
+        }
+    }   
+
+    const handleCloseRequest = () => {
+        setSearchId('')
+        setSuccessRequestMessage(false)
+        setErrorMessage('')
     }
 
     const isValidSearchId = (searchId: string) => {
@@ -241,20 +295,18 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 </div>
             </dialog>
 
-            <dialog id="add_friend_modal" className="modal">
+            <dialog id="add_friend_modal" className="modal" onClose={handleCloseRequest}>
                 <div className="modal-box">
                     <form method="dialog">
                     {/* if there is a button in form, it will close the modal */}
                     <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" 
-                        onClick={()=>{
-                            setSearchId('')
-                            setSuccessRequestMessage(false)
-                        }}>✕</button>
+                        onClick={handleCloseRequest}>✕</button>
                     <h3 className="font-bold text-lg">Add Friend</h3>
                     <input type="text" onChange={(e)=>setSearchId(e.target.value)} value={searchId} placeholder="Enter user ID: " className="input my-2"/>
                     </form>
-                    <button onClick={sendRequest} className={`btn btn-primary ${!isValidSearchId(searchId) && 'pointer-events-none opacity-50'}`}>Send Friend Request</button>
+                    <button onClick={handleSend} className={`btn btn-primary ${!isValidSearchId(searchId) && 'pointer-events-none opacity-50'}`}>Send Friend Request</button>
                     {successRequestMessage && <div className='text-green-400 m-2'>Friend request sent successfully!</div>}
+                    {errorMessage && <div className='text-red-400 m-2'>{errorMessage}</div>}
                 </div>
             </dialog>
         </div>

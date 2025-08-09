@@ -7,7 +7,7 @@ import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
 import { CheckIcon, RequestIcon, UserIcon, XIcon } from '../../assets/icons'
-import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, deleteDoc, writeBatch } from 'firebase/firestore'
+import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
 
@@ -81,7 +81,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
 
         return unsub
     }, [appUser])
-/*
+
     useEffect(() => {
         if (!modalOpen || !appUser) return;
 
@@ -94,8 +94,9 @@ const HomePage = ({user, logOut} : HomeProps) => {
         getDocs(queryRef).then(snapshot => {
             handleSetFriendRequests(snapshot.docs);
         });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [modalOpen]);
-    */
+    
     useEffect(()=>{
         if(appUser){
             const unsub = subscribeConversation(appUser.id, setRecentConversations, setLoading)
@@ -171,6 +172,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
 
     const handleOpenRequest = () => {
         (document.getElementById('request_modal') as HTMLDialogElement)!.showModal();
+        setModalOpen(true)
     }
 
     return (
@@ -222,11 +224,11 @@ const HomePage = ({user, logOut} : HomeProps) => {
                             <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
                             }
                         </div>
-                        <dialog id="request_modal" className="modal">
+                        <dialog id="request_modal" className="modal" onCancel={()=>setModalOpen(false)}>
                             <div className="modal-box">
                                 <form method="dialog">
                                     {/* if there is a button in form, it will close the modal */}
-                                    <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+                                    <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={()=>setModalOpen(false)}>✕</button>
                                     <h3 className="font-bold text-lg">Requests</h3>
                                     {friendRequests.length === 0 ?  <h3>There are no pending requests.</h3> :
                                     <div className='h-64'>
