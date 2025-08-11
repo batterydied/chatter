@@ -138,7 +138,7 @@ class RelationController{
         }
     }
 
-    async denyFriendRequest(req, res){
+    async declineFriendRequest(req, res){
         const { docId } = req.params
         const docRef = doc(db, 'relations', docId)
         try{
@@ -152,7 +152,7 @@ class RelationController{
             }
         }
         catch(e){
-            res.status(500).json({status: 'Failure', message: 'Failed to deny friend request', error: e instanceof Error ? e.message : e})
+            res.status(500).json({status: 'Failure', message: 'Failed to decline friend request', error: e instanceof Error ? e.message : e})
         }
     }
 

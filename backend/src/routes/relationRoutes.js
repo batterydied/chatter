@@ -13,6 +13,8 @@ router.get('/blocked/:id', RelationController.getBlockedUsers)
 
 router.post('/confirm/:docId', RelationController.confirmFriendRequest)
 
+router.post('/decline/:docId', RelationController.declineFriendRequest)
+
 router.post('/friend-request', RelationController.sendFriendRequest)
 
 router.delete('/delete-friend', RelationController.deleteFriend)

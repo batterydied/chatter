@@ -10,6 +10,8 @@ import { CheckIcon, RequestIcon, UserIcon, XIcon } from '../../assets/icons'
 import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
+import axios from 'axios'
+import { toast } from 'sonner'
 
 type HomeProps = {
     user: User | null
@@ -17,6 +19,7 @@ type HomeProps = {
 }
 
 type FriendRequest = {
+    requestId: string,
     from: string,
     username: string
 }
@@ -59,6 +62,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
 
                 const userData = userSnapshot.data();
                 return {
+                    requestId: reqDoc.id,
                     from: data.from,
                     username: userData.username,
                 };
@@ -67,7 +71,21 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const filtered = results.filter((r): r is FriendRequest => r !== null)
     setFriendRequests(filtered)
 };
+    const handleDecline = async (requestId: string) => {
+        try{
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/decline/${requestId}`)
+        }catch{
+            toast.error("Couldn't decline request, try again later.")
+        }
+    }
 
+    const handleAccept = async (requestId: string) => {
+        try{
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/confirm/${requestId}`)
+        }catch{
+            toast.error("Couldn't accept request, try again later.")
+        }
+    }
 
     useEffect(()=>{
         if(!appUser) return
@@ -142,12 +160,12 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                     </div>
                                 </div>
                                 <div className='flex items-center'>
-                                    <div className='w-[30px] h-[30px] rounded-full bg-green-600 mr-6 hover:cursor-pointer hover:bg-green-700 active:bg-green-800 flex justify-center items-center'>
+                                    <div onClick={()=>handleAccept(request.requestId)}className='w-[30px] h-[30px] rounded-full bg-green-600 mr-6 hover:cursor-pointer hover:bg-green-700 active:bg-green-800 flex justify-center items-center'>
                                         <div>
                                             <CheckIcon iconColor='black'/>
                                         </div>
                                     </div>
-                                    <div className='w-[30px] h-[30px] rounded-full bg-red-600 hover:cursor-pointer hover:bg-red-700 active:bg-red-800 flex justify-center items-center'>
+                                    <div onClick={()=>handleDecline(request.requestId)} className='w-[30px] h-[30px] rounded-full bg-red-600 hover:cursor-pointer hover:bg-red-700 active:bg-red-800 flex justify-center items-center'>
                                         <div>
                                             <XIcon iconColor='black' />
                                         </div>
@@ -229,8 +247,8 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <form method="dialog">
                                     {/* if there is a button in form, it will close the modal */}
                                     <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={()=>setModalOpen(false)}>✕</button>
-                                    <h3 className="font-bold text-lg">Requests</h3>
-                                    {friendRequests.length === 0 ?  <h3>There are no pending requests.</h3> :
+                                    <h3 className="font-bold text-lg">Incoming Requests</h3>
+                                    {friendRequests.length === 0 ?  <h3>There are no incoming requests.</h3> :
                                     <div className='h-64'>
                                         <AutoSizer>
                                             {({width, height})=>

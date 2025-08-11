@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or } from 'firebase/firestore'
+import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, QueryDocumentSnapshot } from 'firebase/firestore'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
-import { RemoveUserIcon } from "../../../assets/icons"
+import { RemoveUserIcon, XIcon } from "../../../assets/icons"
 import { toast } from "sonner"
 import forceRemeasure from "../../../utils/forceRemeasure"
 
@@ -12,29 +12,29 @@ type FriendListProps = {
     setSelectedConversation: (conversationId: string) => void
 }
 
-type RawFriend = {
-    id: string,
-    data: {
-        from: string
-    }
-}
-
 export type Friend = {
     relationshipId: string,
     friendId: string,
     username: string
 }
 
+type OutgoingRequest = {
+    to: string,
+    username: string
+}
+
 const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [friends, setFriends] = useState<Friend[]>([])
     const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
-    const [selectedOnline, setSelectedOnline] = useState<boolean>(false)
+    const [selectedOnline, setSelectedOnline] = useState<boolean>(true)
     const onlineFriendRef = useRef<HTMLButtonElement>(null)
     const allFriendRef = useRef<HTMLButtonElement>(null)
     const [removeFriend, setRemoveFriend] = useState<Friend | null>(null)
     const [searchId, setSearchId] = useState<string>('')
     const [successRequestMessage, setSuccessRequestMessage] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
+    const [outgoingRequests, setOutgoingRequests] = useState<OutgoingRequest[]>([])
+    const [modalOpen, setModalOpen] = useState(false)
 
     const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const listRef = useRef<List>(null)
@@ -42,35 +42,19 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
     const handleOnlineFriends = ()=>{
         setSelectedOnline(true)
-        onlineFriendRef.current?.focus()
     }
 
     const handleAllFriends = ()=>{
         setSelectedOnline(false)
-        allFriendRef.current?.focus()
     }
-    useEffect(()=>{
-        if(selectedOnline){
-            onlineFriendRef.current?.focus()
-        }
-    }, [selectedOnline])
 
     useEffect(()=>{
-        const retrieveFriends = async () => {
-            try{
-                const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}/relation/friend/${userId}`)
-                const serializedFriends = await serializeFriends(res.data.friends)
-                setFriends(serializedFriends.filter((f)=> f !== undefined))
-            }catch(e){
-                if (axios.isAxiosError(e)) {
-                    console.log(e.message)
-                } else {
-                    console.log(e)
-                }
-            }
-
-        }
-        retrieveFriends()
+        const queryRef = query(collection(db, 'relations'), where('to', '==', userId), where('status', '==', 'friend'))
+        const unsub = onSnapshot(queryRef, async (snapshot)=>{
+            const docs = snapshot.docs
+            setFriends(await serializeFriends(docs))
+        })
+        return unsub
     }, [userId])
 
     const handleRemoveConfirmation = (friend: Friend) => {
@@ -82,6 +66,42 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         (document.getElementById('add_friend_modal') as HTMLDialogElement)!.showModal();
     }
 
+    const renderRequests: ListRowRenderer= ({ index, key, parent, style }) => {
+        const request = outgoingRequests[index]
+        return (
+            <CellMeasurer
+                key={key}
+                cache={cellMeasurerCache.current}
+                parent={parent}
+                columnIndex={0}
+                rowIndex={index}
+            >
+                {()=>{
+                    return (
+                        <div style={style}>
+                            <div className='p-2 hover:bg-base-200 flex justify-between'>
+                                <div className='flex flex-col items-start'>
+                                    <div>
+                                        {request.username}
+                                    </div>
+                                    <div className='text-xs'>
+                                        {request.to}
+                                    </div>
+                                </div>
+                                <div className='w-[30px] h-[30px] rounded-full bg-red-600 hover:cursor-pointer hover:bg-red-700 active:bg-red-800 flex justify-center items-center'>
+                                    <div>
+                                        <XIcon iconColor='black' />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }}
+            </CellMeasurer>
+        )
+
+    }
+    
     const validateRequest = async () => {
         if(searchId == userId){
             setErrorMessage("You can't add yourself.")
@@ -152,6 +172,10 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         return searchId.length === 20
     }
 
+    const handleOutgoingRequest = () => {
+        (document.getElementById('outgoing_request_modal') as HTMLDialogElement)!.showModal();
+    }
+
     const sendRemove = async (friendId: string) => {
         try{
             await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/relation/delete-friend`, {
@@ -195,6 +219,33 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         )
     };
 
+    const serializeRequest = async (docs: DocumentSnapshot[]) => {
+        const unfiltered = await Promise.all(docs.map(async (d)=>{
+            const data = d.data()
+            if(!data) return null
+
+            const userRef = doc(db, 'users', data.to)
+            const userSnapshot = await getDoc(userRef)
+
+            if(!userSnapshot.exists()) return null
+
+            return {
+                to: data.to,
+                username: userSnapshot.data().username
+            }
+        }))
+
+        return unfiltered.filter((el): el is OutgoingRequest => el != null)
+    }
+
+    useEffect(()=>{
+        const queryRef = query(collection(db, 'relations'), where('from', '==', userId), where('status', '==', 'pending'))
+        const unsub = onSnapshot(queryRef, async (snapshot)=>{
+            setOutgoingRequests(await serializeRequest(snapshot.docs))
+        })
+        return unsub
+    }, [userId])
+
     useEffect(()=>{
         friends.forEach((friend)=>{
             if(friend.friendId in friendDict){
@@ -208,21 +259,18 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     return
                 }
                 
-                const [serializedFriend] = (await serializeFriends([{
-                    id: friend.relationshipId,
-                    data: {
-                        from: friend.friendId
-                    }
-                }]))
-                
-                if(serializedFriend){
-                    setFriends((prev)=>
-                    prev.map((f)=>(f.friendId === friend.friendId ? serializedFriend : f))
-                )}
-                else{
-                    setFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
+                const data = snapshot.data()
+
+                const updatedFriend = {
+                    relationshipId: friend.relationshipId,
+                    friendId: friend.friendId,
+                    username: data.username
                 }
                 
+
+                setFriends((prev)=>
+                prev.map((f)=>(f.friendId === friend.friendId ? updatedFriend : f)))
+    
             })
             friendDict.current[friend.friendId] = unsub
         })
@@ -263,8 +311,9 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         <div className='list justify-start h-full overflow-hidden'>
             <div className='mb-2 border-b border-gray-700 pb-2'>
                 <div className='flex items-start space-x-2'>
-                    <button ref={onlineFriendRef} className='btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none focus:bg-base-100' onClick={handleOnlineFriends}>Online</button>
-                    <button ref={allFriendRef} className='btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:bg-base-100 hover:border-none focus:bg-base-100' onClick={handleAllFriends}>All</button>
+                    <button ref={onlineFriendRef} className={`btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${selectedOnline && '!bg-base-100'}`} onClick={handleOnlineFriends}>Online</button>
+                    <button ref={allFriendRef} className={`btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${!selectedOnline && '!bg-base-100'}`} onClick={handleAllFriends}>All</button>
+                    <button className='btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none' onClick={handleOutgoingRequest}>Outgoing Request</button>
                     <button className='btn bg-primary rounded-lg' onClick={handleAddFriend}>Add Friend</button>
                 </div>
             </div>
@@ -309,20 +358,47 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     {errorMessage && <div className='text-red-400 m-2'>{errorMessage}</div>}
                 </div>
             </dialog>
+             <dialog id="outgoing_request_modal" className="modal" onCancel={()=>setModalOpen(false)}>
+                <div className="modal-box">
+                    <form method="dialog">
+                        {/* if there is a button in form, it will close the modal */}
+                        <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={()=>setModalOpen(false)}>✕</button>
+                        <h3 className="font-bold text-lg">Outgoing Requests</h3>
+                        {outgoingRequests.length === 0 ?  <h3>There are no outgoing requests.</h3> :
+                        <div className='h-64'>
+                            <AutoSizer>
+                                {({width, height})=>
+                                <List
+                                    width={width}
+                                    height={height}
+                                    rowHeight={cellMeasurerCache.current.rowHeight}
+                                    deferredMeasurementCache={cellMeasurerCache.current}
+                                    rowCount={outgoingRequests.length}
+                                    rowRenderer={renderRequests}
+                                    ref={listRef}
+                                />
+                                }           
+                            </AutoSizer>
+                        </div>
+                        }
+                    </form>
+                </div>
+            </dialog>
         </div>
     )
 
 }
 
-const serializeFriends = async (rawFriends: RawFriend[]) => {
-    return await Promise.all(rawFriends.map(async (f)=>{
-        const docRef = doc(db, 'users', f.data.from)
-        const docSnapshot = await getDoc(docRef)
-        if(docSnapshot.exists()){
+const serializeFriends = async (docSnapshots: QueryDocumentSnapshot[]) => {
+    return await Promise.all(docSnapshots.map(async (snapshot)=>{
+        const data = snapshot.data()
+        const userDocRef = doc(db, 'users', data.from)
+        const userDocSnapshot = await getDoc(userDocRef)
+        if(userDocSnapshot.exists()){
             return {
-                relationshipId: f.id,
-                friendId: f.data.from,
-                username: docSnapshot.data().username
+                relationshipId: data.id,
+                friendId: data.from,
+                username: userDocSnapshot.data().username
             }
         }
     }))
