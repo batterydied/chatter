@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, QueryDocumentSnapshot } from 'firebase/firestore'
+import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, QueryDocumentSnapshot, deleteDoc } from 'firebase/firestore'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
-import { RemoveUserIcon, XIcon } from "../../../assets/icons"
+import { RemoveUserIcon } from "../../../assets/icons"
 import { toast } from "sonner"
 import forceRemeasure from "../../../utils/forceRemeasure"
 
@@ -15,12 +15,14 @@ type FriendListProps = {
 export type Friend = {
     relationshipId: string,
     friendId: string,
-    username: string
+    username: string,
+    status: string
 }
 
 type OutgoingRequest = {
     to: string,
-    username: string
+    username: string,
+    id: string
 }
 
 const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
@@ -46,6 +48,11 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
     const handleAllFriends = ()=>{
         setSelectedOnline(false)
+    }
+
+    const handleWithdraw = async (outgoingRequestId: string) => {
+        const docRef = doc(db, 'relations', outgoingRequestId)
+        await deleteDoc(docRef)
     }
 
     useEffect(()=>{
@@ -88,10 +95,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                                         {request.to}
                                     </div>
                                 </div>
-                                <div className='w-[30px] h-[30px] rounded-full bg-red-600 hover:cursor-pointer hover:bg-red-700 active:bg-red-800 flex justify-center items-center'>
-                                    <div>
-                                        <XIcon iconColor='black' />
-                                    </div>
+                                <div className='btn bg-red-600 hover:bg-red-700 active:bg-red-800' onClick={()=>handleWithdraw(request.id)}>
+                                    Withdraw
                                 </div>
                             </div>
                         </div>
@@ -231,7 +236,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
             return {
                 to: data.to,
-                username: userSnapshot.data().username
+                username: userSnapshot.data().username,
+                id: d.id
             }
         }))
 
@@ -247,6 +253,15 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     }, [userId])
 
     useEffect(()=>{
+        const currentFriendsSet = new Set(friends.map(f => f.friendId));
+
+        Object.keys(friendDict.current).forEach((id) => {
+            if (!currentFriendsSet.has(id)) {
+                friendDict.current[id](); // unsubscribe
+                delete friendDict.current[id];
+            }
+        });
+
         friends.forEach((friend)=>{
             if(friend.friendId in friendDict){
                 return
@@ -264,7 +279,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 const updatedFriend = {
                     relationshipId: friend.relationshipId,
                     friendId: friend.friendId,
-                    username: data.username
+                    username: data.username,
+                    status: data.status
                 }
                 
 
@@ -390,18 +406,19 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 }
 
 const serializeFriends = async (docSnapshots: QueryDocumentSnapshot[]) => {
-    return await Promise.all(docSnapshots.map(async (snapshot)=>{
+    return (await Promise.all(docSnapshots.map(async (snapshot)=>{
         const data = snapshot.data()
         const userDocRef = doc(db, 'users', data.from)
         const userDocSnapshot = await getDoc(userDocRef)
-        if(userDocSnapshot.exists()){
-            return {
-                relationshipId: data.id,
-                friendId: data.from,
-                username: userDocSnapshot.data().username
-            }
+        if(!userDocSnapshot.exists()) return null
+        const userData = userDocSnapshot.data()
+        return {
+            relationshipId: data.id,
+            friendId: data.from,
+            username: userData.username,
+            status: userData.status
         }
-    }))
+    }))).filter((f)=>f !== null)
 }
 
 

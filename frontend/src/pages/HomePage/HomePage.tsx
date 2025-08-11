@@ -68,7 +68,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                 };
             })
         );
-    const filtered = results.filter((r): r is FriendRequest => r !== null)
+    const filtered = results.filter((r) => r !== null)
     setFriendRequests(filtered)
 };
     const handleDecline = async (requestId: string) => {
