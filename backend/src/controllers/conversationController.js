@@ -12,6 +12,7 @@ class ConversationController{
             name,
             participants,
             createdAt: serverTimestamp(),
+            hiddenBy: [],
             directConversationId: isDirect ? [...participants].sort().join('_') : ''
         }
 
@@ -21,6 +22,7 @@ class ConversationController{
                 name: conversation.name ?? '',
                 participants: conversation.participants,
                 createdAt: conversation.createdAt,
+                hiddenBy: conversation.hiddenBy,
                 directConversationId: conversation.directConversationId
             }
             const docRef = await addDoc(collectionRef, createdField)

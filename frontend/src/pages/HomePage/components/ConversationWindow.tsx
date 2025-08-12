@@ -8,9 +8,10 @@ import { toast } from 'sonner'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
 import forceRemeasure from '../../../utils/forceRemeasure'
+import type { Conversation } from '../homePageHelpers'
 
 type ConversationWindowProps = {
-  conversationId: string,
+  conversation: Conversation,
   userId: string,
 }
 
@@ -37,7 +38,7 @@ type SerializedMessage = {
   replyId: string
 }
 
-const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps) => {
+const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
@@ -103,7 +104,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     const params = {size, prevMessageId}
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/page`,
+        `${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversation.id}/message/page`,
         {params}
       )
 
@@ -117,7 +118,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       console.error('fetchMessages error', e)
       return []
     }
-  }, [conversationId])
+  }, [conversation])
 
   useEffect(()=>{
     for (const key in subscriptionDict.current) {
@@ -126,7 +127,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
       }
     }
     subscriptionDict.current = {}
-  }, [conversationId])
+  }, [conversation])
 
   const handleSelectHoverId = (msgId: string)=>{
     setHoveredMessageId(msgId)
@@ -138,7 +139,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   
   const handleSubmit = () => {
     if(inputMessage){
-      uploadMessage(conversationId, userId, inputMessage, replyMessage != null, replyMessage?.id || '')
+      uploadMessage(conversation.id, userId, inputMessage, replyMessage != null, replyMessage?.id || '')
       setInputMessage('')
     }
   }
@@ -150,7 +151,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
 
   const sendDelete = async (msgId: string) => {
     try{
-      await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/${msgId}`)
+      await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversation.id}/message/${msgId}`)
       setMessages((prev) => prev.filter((m) => m.id !== msgId))
       setDeleteMessage(null)
       forceRemeasure(cellMeasurerCache, listRef)
@@ -177,7 +178,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
   const handleUpdate = useCallback(async (msg: SerializedMessage, updatedMsg: string) => {
     const sendUpdate = async (msgId: string, updatedMsg: string) => {
       try{
-        await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message/${msgId}`, 
+        await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversation.id}/message/${msgId}`, 
           {
             type: 'text',
             text: updatedMsg
@@ -201,7 +202,7 @@ const ConversationWindow = ({ conversationId, userId }: ConversationWindowProps)
     setEditMessage(null)
 
     forceRemeasure(cellMeasurerCache, listRef)
-  }, [conversationId])
+  }, [conversation.id])
 
   useEffect(() => {
     if (!replyMessage) {
@@ -265,6 +266,7 @@ const handleScroll = useCallback(
       setLoadingMore(true);
       const list = listRef.current
       const moreMessages = await fetchMessages(15, earliestMessageId);
+      if(!moreMessages) return 
       const newEarliestId = moreMessages.length > 0 ? moreMessages[0].id : earliestMessageId;
       const newMessages = [...moreMessages, ...messages];
 
@@ -484,7 +486,7 @@ const handleScroll = useCallback(
       if(msg.senderId === userId || msg.id in subscriptionDict.current){
         return
       }
-      const msgRef = doc(db, 'conversations', conversationId, 'messages', msg.id);
+      const msgRef = doc(db, 'conversations', conversation.id, 'messages', msg.id);
 
       const unsub = onSnapshot(msgRef, async (snapshot) => {
         if (!snapshot.exists()){ 
@@ -531,12 +533,13 @@ const handleScroll = useCallback(
       });
     });
 
-  }, [conversationId, messages, userId]);
+  }, [conversation, messages, userId]);
 
 
   useEffect(() => {
+    if(!conversation.id) return
     const queryRef = query(
-      collection(db, 'conversations', conversationId, 'messages'),
+      collection(db, 'conversations', conversation.id, 'messages'),
       orderBy('createdAt', 'desc'),
       limit(1)
     );
@@ -574,7 +577,7 @@ const handleScroll = useCallback(
     });
     
     return unsub;
-  }, [conversationId, userId, isNearBottom]);
+  }, [conversation, userId, isNearBottom]);
 
 
   if(!messages){
@@ -593,8 +596,17 @@ const handleScroll = useCallback(
   } 
   return (
     <div className='h-full w-full flex flex-col'>
+        <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
+          <div className="avatar">
+            <div className="w-6 rounded-full">
+              <img src="https://img.daisyui.com/images/profile/demo/gordon@192.webp" />
+            </div>
+          </div>
+          <div className='ml-2 text-white'>{conversation.name}</div>
+        </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='my-3 w-full h-screen'>
+          {messages.length != 0 ? 
           <AutoSizer>
             {({width, height})=>
               <List
@@ -609,7 +621,12 @@ const handleScroll = useCallback(
                 ref={listRef}
               />
             }
-          </AutoSizer>
+          </AutoSizer> :
+          <div>
+            This is the start of your conversation history!
+          </div>
+          }
+          
         </div>
       <div>
         {replyMessage && 

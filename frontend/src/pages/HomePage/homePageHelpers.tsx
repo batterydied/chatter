@@ -12,6 +12,8 @@ export type AppUser = {
 export type Conversation = {
     id: string,
     name: string,
+    hiddenBy: string[],
+    participants: string[]
 }
 
 export const fetchUserFromDB = async (
@@ -65,12 +67,15 @@ export const subscribeConversation = (
       orderBy('lastMessageTime', 'desc')
     );
     const unsub = onSnapshot(queryRef, async (snapshot)=>{
-        const conversations: Conversation[] = await Promise.all(snapshot.docs.map(async (doc)=>(
-            {
+        const conversations: Conversation[] = await Promise.all(snapshot.docs.map(async (doc)=>{
+            const data = doc.data()
+            return {
                 id: doc.id,
-                name: await serializeName(doc.data().name, doc.data().participants, userId)
+                name: await serializeName(data.name, data.participants, userId),
+                hiddenBy: data.hiddenBy,
+                participants: data.participants
             }
-        )))
+        }))
         setter(conversations)
         setLoading(false)
     })
@@ -78,7 +83,7 @@ export const subscribeConversation = (
     return unsub
 }
 
-const serializeName = async (name: string, participants: string[], userId: string) => {
+export const serializeName = async (name: string, participants: string[], userId: string) => {
     const MAX_LENGTH = 15
     if(name == ""){
         const filteredIds = participants.filter((participant) => participant != userId)
@@ -95,23 +100,4 @@ const serializeName = async (name: string, participants: string[], userId: strin
         return name
     }
 }
-
-export const renderConversations = (
-    conversations: Conversation[], 
-    setSelectedConversation: (conversationId: string | null)=>void,
-    selectedConversation: string | null
-) => {
-  return conversations.map((c) => {
-    const highlightConversation = selectedConversation == c.id
-    return (
-        <li className={`list-row no-list-divider cursor-pointer transition-colors hover:bg-neutral ${highlightConversation ? 'bg-base-300' : ''}`}
-        onClick={()=>{
-            setSelectedConversation(c.id)
-        }} 
-        key={c.id}>
-            <p>{c.name}</p>
-        </li>
-    )
-    });
-};
 

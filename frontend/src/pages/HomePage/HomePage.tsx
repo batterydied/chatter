@@ -1,13 +1,13 @@
 import type { User } from 'firebase/auth'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
-import { fetchUserFromDB, subscribeConversation, renderConversations } from './homePageHelpers'
+import { fetchUserFromDB, subscribeConversation } from './homePageHelpers'
 import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
 import { CheckIcon, RequestIcon, UserIcon, XIcon } from '../../assets/icons'
-import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch } from 'firebase/firestore'
+import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
 import axios from 'axios'
@@ -29,11 +29,15 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [appUser, setAppUser] = useState<AppUser | null>(null)
     const [recentConversations, setRecentConversations] = useState<Conversation[]>([])
     const [loading, setLoading] = useState(true)
-    const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
+    const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
     const [modalOpen, setModalOpen] = useState(false)
-    const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
-    const listRef = useRef<List>(null)
+
+    const requestCellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
+    const requestListRef = useRef<List>(null)
+
+    const conversationCellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
+    const conversationListRef = useRef<List>(null)
 
     const navigate = useNavigate();
 
@@ -137,12 +141,57 @@ const HomePage = ({user, logOut} : HomeProps) => {
         
         await batch.commit();
     }
+
+    const handleHideConversation = async (conversation: Conversation) => {
+        const conversationRef = doc(db, 'conversations', conversation.id)
+        await updateDoc(conversationRef, {hiddenBy: [...conversation.hiddenBy, appUser!.id]})
+    }
+
+    const renderRecentConversations: ListRowRenderer = ({index, key, parent, style }) => {
+        const conversation = recentConversations[index]
+        const highlightConversation = selectedConversation?.id == conversation.id
+        const isHidden = conversation.hiddenBy.some(userId => userId === appUser!.id)
+        if(isHidden) return
+        return (
+            <CellMeasurer
+             key={key}
+             cache={conversationCellMeasurerCache.current}
+             parent={parent}
+             columnIndex={0}
+             rowIndex={index}>
+                {()=>{
+                    return (
+                        <div style={style}>
+                            <li className={`list-row no-list-divider cursor-pointer transition-colors hover:bg-neutral 
+                                flex justify-between items-center group
+                                ${highlightConversation ? 'bg-base-300' : ''}`}
+                            onClick={()=>{
+                                setSelectedConversation(conversation)
+                            }} 
+                            >
+                                <div className='flex items-center'>
+                                    <div className='avatar mr-2'>
+                                        <div className="w-10 rounded-full">
+                                            <img src="https://img.daisyui.com/images/profile/demo/yellingcat@192.webp" />
+                                        </div>
+                                    </div>
+                                    <div>{conversation.name}</div>
+                                </div>
+                                <XIcon onClick={()=>handleHideConversation(conversation)} className='hidden group-hover:block rounded-full hover:outline-1 hover:outline-accent' iconColor='white'/>
+                            </li>
+                        </div>
+                    )
+                }}
+            </CellMeasurer>
+        )
+
+    }
     const renderRequests: ListRowRenderer= ({ index, key, parent, style }) => {
         const request = friendRequests[index]
         return (
             <CellMeasurer
               key={key}
-              cache={cellMeasurerCache.current}
+              cache={requestCellMeasurerCache.current}
               parent={parent}
               columnIndex={0}
               rowIndex={index}
@@ -201,7 +250,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                 ) : (
                     <div className='flex flex-row w-full h-full'>
                         <div className='min-w-[360px]'>
-                            <ul className='list h-5/6 overflow-y-auto'>
+                            <ul className='list h-5/6 overflow-y-auto overflow-x-hidden'>
                                 <li>
                                     <button className='btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300' onClick={()=>setSelectedConversation(null)}>
                                         <UserIcon iconColor='white' />
@@ -218,7 +267,20 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <div className='my-1 flex justify-start text-gray-600 text-sm'>
                                     Direct Messages
                                 </div>
-                                {renderConversations(recentConversations, setSelectedConversation, selectedConversation)}
+                                <AutoSizer>
+                                    {({width, height})=>
+                                        <List
+                                            width={width}
+                                            height={height}
+                                            rowHeight={conversationCellMeasurerCache.current.rowHeight}
+                                            deferredMeasurementCache={conversationCellMeasurerCache.current}
+                                            rowCount={recentConversations.length}
+                                            rowRenderer={renderRecentConversations}
+                                            ref={conversationListRef}
+                                            className='overflow-x-hidden'
+                                        />
+                                    }
+                                </AutoSizer>
                             </ul>
                             <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
                                 <div className='flex flex-row items-center'>
@@ -237,7 +299,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                         </div>
                         <div className='ml-2 p-2 w-full bg-base-300'>
                             {selectedConversation ? 
-                            <ConversationWindow conversationId={selectedConversation} userId={appUser!.id}/>
+                            <ConversationWindow conversation={selectedConversation} userId={appUser!.id}/>
                             : 
                             <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
                             }
@@ -255,11 +317,11 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                             <List
                                                 width={width}
                                                 height={height}
-                                                rowHeight={cellMeasurerCache.current.rowHeight}
-                                                deferredMeasurementCache={cellMeasurerCache.current}
+                                                rowHeight={requestCellMeasurerCache.current.rowHeight}
+                                                deferredMeasurementCache={requestCellMeasurerCache.current}
                                                 rowCount={friendRequests.length}
                                                 rowRenderer={renderRequests}
-                                                ref={listRef}
+                                                ref={requestListRef}
                                             />
                                             }           
                                         </AutoSizer>

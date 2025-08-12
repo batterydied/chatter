@@ -4,6 +4,7 @@
   margin: 0 auto;
   padding: 1rem;
   text-align: center;
+  scrollbar-width: thin;
 }
 
 .list{
@@ -12,10 +13,6 @@
 
 .no-list-divider::after {
   content: none;
-}
-
-.list:hover{
-  scrollbar-width: thin;
 }
 
 button:hover{

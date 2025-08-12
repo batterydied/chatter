@@ -1,22 +1,23 @@
 import { useState, useEffect, useRef } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, QueryDocumentSnapshot, deleteDoc } from 'firebase/firestore'
+import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, QueryDocumentSnapshot, deleteDoc, updateDoc } from 'firebase/firestore'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
 import { RemoveUserIcon } from "../../../assets/icons"
 import { toast } from "sonner"
 import forceRemeasure from "../../../utils/forceRemeasure"
+import { serializeName, type Conversation } from "../homePageHelpers"
 
 type FriendListProps = {
     userId: string,
-    setSelectedConversation: (conversationId: string) => void
+    setSelectedConversation: (conversation: Conversation) => void
 }
 
 export type Friend = {
     relationshipId: string,
     friendId: string,
     username: string,
-    status: string
+    isOnline: boolean
 }
 
 type OutgoingRequest = {
@@ -27,7 +28,6 @@ type OutgoingRequest = {
 
 const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [friends, setFriends] = useState<Friend[]>([])
-    const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
     const [selectedOnline, setSelectedOnline] = useState<boolean>(true)
     const onlineFriendRef = useRef<HTMLButtonElement>(null)
     const allFriendRef = useRef<HTMLButtonElement>(null)
@@ -60,6 +60,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         const unsub = onSnapshot(queryRef, async (snapshot)=>{
             const docs = snapshot.docs
             setFriends(await serializeFriends(docs))
+            forceRemeasure(cellMeasurerCache, listRef)
         })
         return unsub
     }, [userId])
@@ -179,6 +180,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
     const handleOutgoingRequest = () => {
         (document.getElementById('outgoing_request_modal') as HTMLDialogElement)!.showModal();
+        setModalOpen(true)
     }
 
     const sendRemove = async (friendId: string) => {
@@ -196,8 +198,10 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             toast.error('Could not remove friend, try again later.')
         }
     }
+
     const renderFriends: ListRowRenderer = ({ index, key, parent, style }) => {
         const friend = friends[index]
+        if(selectedOnline && !friend.isOnline) return null
         return (
             <CellMeasurer
                 key={key}
@@ -209,7 +213,11 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 {()=>
                 <div style={style} className='relative'>
                     <div onClick={async ()=> await openConversation(friend.friendId, userId)} className='rounded-none list-row cursor-pointer hover:bg-neutral hover:rounded-xl flex justify-start items-center overflow-hidden'>
-                        <img className="w-10 rounded-full" src="https://img.daisyui.com/images/profile/demo/anakeen@192.webp" />
+                        <div className={`avatar ${friend.isOnline ? 'avatar-online' : 'avatar-offline'}`}>
+                            <div className="w-10 rounded-full">
+                                <img src="https://img.daisyui.com/images/profile/demo/gordon@192.webp" />
+                            </div>
+                        </div>
                         <p>{friend.username}</p>
                         <div className='ml-auto hover:bg-base-300 rounded-full p-2' onClick={(e)=>{
                             e.stopPropagation()
@@ -253,6 +261,32 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     }, [userId])
 
     useEffect(()=>{
+        if(!modalOpen) return
+
+        const fetchUpdatedRequests = async () => {
+        const updatedRequests = await Promise.all(
+        outgoingRequests.map(async (req) => {
+            const docSnap = await getDoc(doc(db, 'users', req.to));
+            if (!docSnap.exists()) return null;
+            const data = docSnap.data();
+            return {
+            to: req.to,
+            id: req.id,
+            username: data.username,
+            };
+        })
+        );
+
+        const filtered = updatedRequests.filter((req) => req !== null);
+        setOutgoingRequests(filtered);
+    };
+
+    fetchUpdatedRequests();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [modalOpen])
+
+    useEffect(()=>{
         const currentFriendsSet = new Set(friends.map(f => f.friendId));
 
         Object.keys(friendDict.current).forEach((id) => {
@@ -271,6 +305,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             const unsub = onSnapshot(friendRef, async (snapshot)=>{
                 if (!snapshot.exists()){
                     setFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
+                    forceRemeasure(cellMeasurerCache, listRef)
                     return
                 }
                 
@@ -280,12 +315,14 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     relationshipId: friend.relationshipId,
                     friendId: friend.friendId,
                     username: data.username,
-                    status: data.status
+                    isOnline: data.isOnline
                 }
                 
 
                 setFriends((prev)=>
                 prev.map((f)=>(f.friendId === friend.friendId ? updatedFriend : f)))
+
+                forceRemeasure(cellMeasurerCache, listRef)
     
             })
             friendDict.current[friend.friendId] = unsub
@@ -301,7 +338,6 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
     const openConversation = async (userId1: string, userId2: string) => {
         const queryRef = query(collection(db, 'conversations'), where('directConversationId', '==', [userId1, userId2].sort().join('_')))
-
         try{
             const docSnapshot = await getDocs(queryRef)
 
@@ -311,15 +347,30 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     isDirect: true
                 }
                 const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation`, reqBody)
-                setSelectedConversation(res.data.conversationId)
+                const data = res.data.data
+                const conversation = {
+                    id: data.conversationId,
+                    name: await serializeName(data.name, data.participants, userId),
+                    hiddenBy: data.hiddenBy,
+                    participants: data.participants
+                }
+                setSelectedConversation(conversation)
             }else{
-                setSelectedConversation(docSnapshot.docs[0].id)
+                const selectedDoc = docSnapshot.docs[0]
+                const data = selectedDoc.data()
+                setSelectedConversation({
+                    id: selectedDoc.id,
+                    name: await serializeName(data.name, data.participants, userId),
+                    hiddenBy: data.hiddenBy,
+                    participants: data.participants
+                })
+                await updateDoc(selectedDoc.ref, {hiddenBy: selectedDoc.data().hiddenBy.filter((id: string) => id !== userId)})
             }
         }catch(e){
             if(axios.isAxiosError(e)){
-                console.log(e)
+                toast.error(e.message)
             }else{
-                console.log('Unknown error occurred')
+                console.log(e)
             }
         }
     }
@@ -413,10 +464,10 @@ const serializeFriends = async (docSnapshots: QueryDocumentSnapshot[]) => {
         if(!userDocSnapshot.exists()) return null
         const userData = userDocSnapshot.data()
         return {
-            relationshipId: data.id,
+            relationshipId: snapshot.id,
             friendId: data.from,
             username: userData.username,
-            status: userData.status
+            isOnline: userData.isOnline
         }
     }))).filter((f)=>f !== null)
 }
