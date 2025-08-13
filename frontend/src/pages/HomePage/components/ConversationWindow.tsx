@@ -611,6 +611,7 @@ const handleScroll = useCallback(
         replyId
       }
       setShouldOpenPicker(false)
+      setReplyMessage(null)
       await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`, message)
     }catch(e){
       if(axios.isAxiosError(e)){
@@ -646,7 +647,7 @@ const handleScroll = useCallback(
           <div className='ml-2 text-white'>{conversation.name}</div>
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
-        <div className='my-3 w-full h-screen'>
+        <div className='w-full h-screen'>
           <AutoSizer>
             {({width, height})=>
               <List
@@ -659,6 +660,7 @@ const handleScroll = useCallback(
                 scrollToIndex={shouldScrollToBottom ? messages.length - 1 : undefined}
                 onScroll={handleScroll}
                 ref={listRef}
+                className='mt-2'
               />
             }
           </AutoSizer> 

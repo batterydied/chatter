@@ -28,6 +28,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [isNewUser, setIsNewUser] = useState<boolean | null>(null)
     const [appUser, setAppUser] = useState<AppUser | null>(null)
     const [recentConversations, setRecentConversations] = useState<Conversation[]>([])
+    const [visibleConversations, setVisibleConversations] = useState<Conversation[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
@@ -40,6 +41,9 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const conversationListRef = useRef<List>(null)
 
     const navigate = useNavigate();
+    useEffect(()=>{
+        setVisibleConversations(recentConversations.filter((c)=>!c.hiddenBy.includes(appUser?.id || '')))
+    }, [recentConversations, appUser])
 
     useEffect(()=>{
         if(!user) {
@@ -147,11 +151,9 @@ const HomePage = ({user, logOut} : HomeProps) => {
         await updateDoc(conversationRef, {hiddenBy: [...conversation.hiddenBy, appUser!.id]})
     }
 
-    const renderRecentConversations: ListRowRenderer = ({index, key, parent, style }) => {
-        const conversation = recentConversations[index]
+    const renderConversations: ListRowRenderer = ({index, key, parent, style }) => {
+        const conversation = visibleConversations[index]
         const highlightConversation = selectedConversation?.id == conversation.id
-        const isHidden = conversation.hiddenBy.some(userId => userId === appUser!.id)
-        if(isHidden) return
         return (
             <CellMeasurer
              key={key}
@@ -274,8 +276,8 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                             height={height}
                                             rowHeight={conversationCellMeasurerCache.current.rowHeight}
                                             deferredMeasurementCache={conversationCellMeasurerCache.current}
-                                            rowCount={recentConversations.length}
-                                            rowRenderer={renderRecentConversations}
+                                            rowCount={visibleConversations.length}
+                                            rowRenderer={renderConversations}
                                             ref={conversationListRef}
                                             className='overflow-x-hidden'
                                         />
