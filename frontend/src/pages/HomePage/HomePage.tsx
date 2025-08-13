@@ -291,7 +291,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                     </div>
                                     <div className='pl-2'>
                                         <p className='text-sm text-left'>{appUser?.username}</p>
-                                        <p className='text-neutral-content'>status</p>
+                                        <p className='text-sm text-neutral-content'>ID: {appUser?.id}</p>
                                     </div>
                                 </div>
                                 <button className='btn btn-neutral' onClick={logOut}>L</button>

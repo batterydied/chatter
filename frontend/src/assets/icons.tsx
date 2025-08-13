@@ -12,7 +12,7 @@ export const EditIcon = ({iconColor='#000000', className, onClick}: iconProps) =
     )
 }
 
-export const ReactIcon = ({iconColor='#000000', className, onClick}: iconProps) => {
+export const SmileIcon = ({iconColor='#000000', className, onClick}: iconProps) => {
     return (
         <svg onClick={onClick} className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color={iconColor} fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></circle>

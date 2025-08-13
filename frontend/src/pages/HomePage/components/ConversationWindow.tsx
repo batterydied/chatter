@@ -3,12 +3,14 @@ import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import type { Firestore, Timestamp } from 'firebase/firestore'
-import { EditIcon, ReactIcon, ReplyIcon, DeleteIcon } from '../../../assets/icons'
+import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
 import forceRemeasure from '../../../utils/forceRemeasure'
 import type { Conversation } from '../homePageHelpers'
+import EmojiPicker from 'emoji-picker-react'
+import { Theme } from 'emoji-picker-react';
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -55,6 +57,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false)
   const [initialScrollDone, setInitialScrollDone] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(false)
+  const [shouldOpenPicker, setShouldOpenPicker] = useState(false)
 
   const subscriptionDict = useRef<Record<string, ()=>void>>({})
 
@@ -63,6 +66,8 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const textareaElRef = useRef<HTMLTextAreaElement | null>(null)
   const listRef = useRef<List>(null)
   const measureRef = useRef<(() => void) | null>(null)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const pickerIconRef = useRef<HTMLDivElement>(null)
 
   const textareaRef = useCallback((ele: HTMLTextAreaElement | null) => {
     if(ele){
@@ -405,7 +410,7 @@ const handleScroll = useCallback(
                     hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'
                   } rounded-md p-1`}
                 >
-                  <ReactIcon iconColor="#fff" />
+                  <SmileIcon iconColor='white' />
                 </button>
                 {userId == msg.senderId && (
                   <button
@@ -419,7 +424,7 @@ const handleScroll = useCallback(
                       hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'
                     } rounded-md p-1`}
                   >
-                    <EditIcon iconColor="#fff" />
+                    <EditIcon iconColor='white' />
                   </button>
                 )}
                 <button
@@ -430,7 +435,7 @@ const handleScroll = useCallback(
                     hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'
                   } rounded-md p-1`}
                 >
-                  <ReplyIcon iconColor="#fff" />
+                  <ReplyIcon iconColor='white' />
                 </button>
                 {userId == msg.senderId && (
                   <button
@@ -438,7 +443,7 @@ const handleScroll = useCallback(
                     onMouseEnter={() => setHoveredIcon('delete')}
                     onMouseLeave={() => setHoveredIcon(null)}
                     className={`cursor-pointer ${
-                      hoveredIcon == 'delete' ? 'bg-red-800' : 'bg-base-100'
+                      hoveredIcon == 'delete' ? 'bg-gray-700' : 'bg-base-100'
                     } rounded-md p-1`}
                   >
                     <DeleteIcon iconColor="#D0021B" />
@@ -535,6 +540,19 @@ const handleScroll = useCallback(
 
   }, [conversation, messages, userId]);
 
+  useEffect(()=>{
+    if(!shouldOpenPicker) return
+    const handleClosePicker = (e: MouseEvent) => {
+       if (pickerRef.current && !pickerRef.current.contains(e.target as Node) && 
+       pickerIconRef.current && !pickerIconRef.current.contains(e.target as Node)) {
+        setShouldOpenPicker(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClosePicker)
+
+    return ()=>document.removeEventListener('mousedown', handleClosePicker)
+  }, [shouldOpenPicker])
 
   useEffect(() => {
     if(!conversation.id) return
@@ -579,6 +597,29 @@ const handleScroll = useCallback(
     return unsub;
   }, [conversation, userId, isNearBottom]);
 
+  const handlePicker = () => {
+    setShouldOpenPicker((prev)=> !prev)
+  }
+
+  const uploadMessage = async (conversationId: string, userId: string, inputMessage: string, isReply: boolean, replyId: string) => {
+    try{
+      const message = {
+        senderId: userId,
+        type: 'text',
+        text: inputMessage,
+        isReply,
+        replyId
+      }
+      setShouldOpenPicker(false)
+      await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`, message)
+    }catch(e){
+      if(axios.isAxiosError(e)){
+        console.log(e.message)
+      }else{
+        console.log('Unknown error occurred')
+      }
+    }
+  }
 
   if(!messages){
     return (
@@ -606,7 +647,6 @@ const handleScroll = useCallback(
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='my-3 w-full h-screen'>
-          {messages.length != 0 ? 
           <AutoSizer>
             {({width, height})=>
               <List
@@ -621,12 +661,7 @@ const handleScroll = useCallback(
                 ref={listRef}
               />
             }
-          </AutoSizer> :
-          <div>
-            This is the start of your conversation history!
-          </div>
-          }
-          
+          </AutoSizer> 
         </div>
       <div>
         {replyMessage && 
@@ -635,25 +670,43 @@ const handleScroll = useCallback(
           >
             Replying to {replyUsername}<button onClick={()=>setReplyMessage(null)}>X</button>
           </div>}
-        <textarea
-          id="chat-message"
-          rows={1}
-          placeholder="Type a message..."
-          value={inputMessage}
-          onChange={(e) => {
-            setInputMessage(e.target.value);
-            e.currentTarget.style.height = 'auto'; // Reset height
-            e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // Resize
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit();
-            }
-          }}
-          ref={textareaRef}
-          className="textarea textarea-md w-full mt-2 resize-none overflow-auto focus:outline-0 !min-h-0"
-        />
+        <div className='relative'>
+          <div className="absolute right-0 bottom-full" ref={pickerRef}>
+            <EmojiPicker 
+            onEmojiClick={(emojiObj)=>{
+              setInputMessage((prev)=>prev + emojiObj.emoji)
+              textareaElRef.current?.focus();
+            }} 
+            theme={'dark' as Theme}
+            lazyLoadEmojis={true}
+            open={shouldOpenPicker}
+            />
+          </div>
+          <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-center p-2'>
+            <textarea
+              id="chat-message"
+              rows={1}
+              placeholder="Type a message..."
+              value={inputMessage}
+              onChange={(e) => {
+                setInputMessage(e.target.value);
+                e.currentTarget.style.height = 'auto'; // Reset height
+                e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // Resize
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+              ref={textareaRef}
+              className="focus:outline-none textarea-md w-[90%] resize-none overflow-auto !min-h-0"
+            />
+            <div className='hover:bg-base-100 p-1 rounded-md' ref={pickerIconRef}>
+              <SmileIcon onClick={handlePicker} className='hover:cursor-pointer hover:accent' iconColor={shouldOpenPicker ? 'white' : 'gray'} />
+            </div>
+          </div>
+        </div>
 
       </div>
       <dialog id="delete_confirmation_modal" className="modal">
@@ -705,25 +758,6 @@ const formatMessageTime = (date: Date): string => {
       minute: '2-digit',
       hour12: true,
     })
-  }
-}
-
-const uploadMessage = async (conversationId: string, userId: string, inputMessage: string, isReply: boolean, replyId: string) => {
-  try{
-    const message = {
-      senderId: userId,
-      type: 'text',
-      text: inputMessage,
-      isReply,
-      replyId
-    }
-    await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`, message)
-  }catch(e){
-    if(axios.isAxiosError(e)){
-      console.log(e.message)
-    }else{
-      console.log('Unknown error occurred')
-    }
   }
 }
 

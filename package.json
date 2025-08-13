@@ -11,5 +11,8 @@
   "description": "",
   "devDependencies": {
     "concurrently": "^9.2.0"
+  },
+  "dependencies": {
+    "emoji-picker-react": "^4.13.2"
   }
 }

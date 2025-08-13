@@ -418,6 +418,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" 
                         onClick={handleCloseRequest}>✕</button>
                     <h3 className="font-bold text-lg">Add Friend</h3>
+                    <div>Your friend ID: {userId}</div>
                     <input type="text" onChange={(e)=>setSearchId(e.target.value)} value={searchId} placeholder="Enter user ID: " className="input my-2"/>
                     </form>
                     <button onClick={handleSend} className={`btn btn-primary ${!isValidSearchId(searchId) && 'pointer-events-none opacity-50'}`}>Send Friend Request</button>
