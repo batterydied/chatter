@@ -146,7 +146,11 @@ const HomePage = ({user, logOut} : HomeProps) => {
         await batch.commit();
     }
 
-    const handleHideConversation = async (conversation: Conversation) => {
+    const handleHideConversation = async (e: React.MouseEvent, conversation: Conversation) => {
+        e.stopPropagation()
+        if(selectedConversation?.id == conversation.id){
+            setSelectedConversation(null)
+        }
         const conversationRef = doc(db, 'conversations', conversation.id)
         await updateDoc(conversationRef, {hiddenBy: [...conversation.hiddenBy, appUser!.id]})
     }
@@ -179,7 +183,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                     </div>
                                     <div>{conversation.name}</div>
                                 </div>
-                                <XIcon onClick={()=>handleHideConversation(conversation)} className='hidden group-hover:block rounded-full hover:outline-1 hover:outline-accent' iconColor='white'/>
+                                <XIcon onClick={(e)=>handleHideConversation(e, conversation)} className='hidden group-hover:block rounded-full hover:outline-1 hover:outline-accent' iconColor='white'/>
                             </li>
                         </div>
                     )
