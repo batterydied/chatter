@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore'
 import type { Firestore, Timestamp } from 'firebase/firestore'
 import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
@@ -11,7 +11,7 @@ import forceRemeasure from '../../../utils/forceRemeasure'
 import type { Conversation } from '../homePageHelpers'
 import EmojiPicker from 'emoji-picker-react'
 import { Theme } from 'emoji-picker-react'
-import { Reactions } from './conversationWindowHelper'
+import { Reactions, type Reaction, type SerializedMessage } from './conversationWindowHelper'
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -27,22 +27,6 @@ type RawMessage = {
   isEdited: boolean,
   isReply: boolean,
   replyId: string
-  reactions: {
-    user: string
-    emoji: string,
-  }[]
-}
-
-type SerializedMessage = {
-  id: string
-  text: string
-  username: string
-  messageTime: string,
-  senderId: string,
-  timestamp: Date,
-  isEdited: boolean,
-  isReply: boolean,
-  replyId: string,
   reactions: {
     user: string
     emoji: string,
@@ -270,6 +254,33 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  const handleIncrement = (emoji: string, msgId: string) => {
+    let updatedReactions: Reaction[] = []
+    const updatedMessages = messages.map((m)=>{
+      if(m.id == msgId){
+        updatedReactions = [...m.reactions, {user: userId, emoji }]
+        return {...m, reactions: updatedReactions}
+      }
+      return m
+    })
+    setMessages(updatedMessages)
+    const msgRef = doc(db, 'conversations', conversation.id, 'messages', msgId)
+    updateDoc(msgRef, {reactions: updatedReactions})
+  }
+
+  const handleDecrement = (emoji: string, msgId: string) => {
+    let updatedReactions: Reaction[] = []
+    const updatedMessages = messages.map((m)=>{
+      if(m.id == msgId){
+        updatedReactions = [...m.reactions.filter((x)=> x.emoji != emoji || x.user != userId)]
+        return {...m, reactions: updatedReactions}
+      }
+      return m
+    })
+    setMessages(updatedMessages)
+    const msgRef = doc(db, 'conversations', conversation.id, 'messages', msgId)
+    updateDoc(msgRef, {reactions: updatedReactions})
+  }
 const handleScroll = useCallback(
   async ({scrollTop, clientHeight, scrollHeight}:{scrollTop: number, clientHeight: number, scrollHeight: number}) => {
     if (!initialScrollDone || !listRef.current || loadingMore || !hasMore) return;
@@ -366,8 +377,6 @@ const handleScroll = useCallback(
                   <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
                 </div>
               )}
-              <Reactions appUserId={userId} reactions={msg.reactions}/>
-
               <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
                 <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
                   {repliedMessageId === '' ? null : repliedMessage ? (
@@ -403,6 +412,15 @@ const handleScroll = useCallback(
                     {msg.text}
                   </div>
                 )}
+              </div>
+              <div className="chat-footer mt-1 text-lg">
+                <Reactions
+                  msgId={msg.id}
+                  reactions={msg.reactions}
+                  appUserId={userId}
+                  handleIncrement={handleIncrement}
+                  handleDecrement={handleDecrement}
+                />
               </div>
             </div>
 
@@ -502,7 +520,7 @@ const handleScroll = useCallback(
 
   useEffect(() => {
     messages.forEach((msg) => {
-      if(msg.senderId === userId || msg.id in subscriptionDict.current){
+      if(msg.id in subscriptionDict.current){
         return
       }
       const msgRef = doc(db, 'conversations', conversation.id, 'messages', msg.id);
@@ -515,7 +533,7 @@ const handleScroll = useCallback(
         }
 
         const data = snapshot.data();
-
+        console.log(data.reactions)
         const [serialized] = await serializeMessages([{
           id: snapshot.id,
           createdAt: data.createdAt,
@@ -539,7 +557,8 @@ const handleScroll = useCallback(
               m.text !== serialized.text ||
               m.isEdited !== serialized.isEdited ||
               m.senderId !== serialized.senderId || // if needed
-              m.replyId !== serialized.replyId
+              m.replyId !== serialized.replyId ||
+              m.reactions !== serialized.reactions
               // add more fields to compare if relevant
             ) {
               updated = true;
@@ -684,6 +703,7 @@ const handleScroll = useCallback(
                 scrollToIndex={shouldScrollToBottom ? messages.length - 1 : undefined}
                 onScroll={handleScroll}
                 ref={listRef}
+                rowKey={({ index }:{index: number}) => messages[index].id}
                 className='mt-2'
               />
             }

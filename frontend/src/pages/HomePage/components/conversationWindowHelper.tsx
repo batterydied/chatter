@@ -1,11 +1,14 @@
-type Reaction = {
+export type Reaction = {
     user: string,
     emoji: string,
 }
 
 type ReactionsProps = {
     reactions: Reaction[],
-    appUserId: string
+    msgId: string,
+    appUserId: string,
+    handleIncrement: (emoji: string, msgId: string) => void,
+    handleDecrement: (emoji: string, msgId: string) => void
 }
 
 type SerializedReaction = {
@@ -14,8 +17,23 @@ type SerializedReaction = {
     users: string[]
 }
 
-export const Reactions = ({reactions, appUserId}: ReactionsProps) => {
-    console.log(reactions)
+export type SerializedMessage = {
+  id: string
+  text: string
+  username: string
+  messageTime: string,
+  senderId: string,
+  timestamp: Date,
+  isEdited: boolean,
+  isReply: boolean,
+  replyId: string,
+  reactions: {
+    user: string
+    emoji: string,
+  }[]
+}
+
+export const Reactions = ({msgId, reactions, appUserId, handleIncrement, handleDecrement}: ReactionsProps) => {
     const serializeReactions = (reactions: Reaction[]) => {
         const serializedReactions: Record<string, SerializedReaction> = {}
 
@@ -34,20 +52,12 @@ export const Reactions = ({reactions, appUserId}: ReactionsProps) => {
     }
     const serializedReactions = serializeReactions(reactions)
 
-    const handleIncrement = (emoji: string, appUserId: string) => {
-        console.log(emoji, appUserId)
-    }
-
-    const handleDecrement = (emoji: string, appUserId: string) => {
-        console.log(emoji, appUserId)
-    }
-
     return (
-        <ul className='flex'>
+        <ul className='flex justify-end'>
             {serializedReactions.map(([key, data])=>{
                 const reactedByAppUser = data.users.some((id) => id === appUserId)
                 return (
-                    <li key={key} onClick={reactedByAppUser ? ()=>handleDecrement(key, appUserId) : ()=>handleIncrement(key, appUserId)} className={`hover:cursor-pointer px-1 border-1 ${reactedByAppUser ? 'hover:bg-blue-800 bg-blue-900 border-blue-600': 'hover:bg-gray-800 bg-gray-900 border-gray-600'} rounded-md`}>
+                    <li key={key} onClick={reactedByAppUser ? ()=>handleDecrement(key, msgId) : ()=>handleIncrement(key, msgId)} className={`hover:cursor-pointer px-1 border-1 ${reactedByAppUser ? 'hover:bg-blue-800 bg-blue-900 border-blue-600': 'hover:bg-gray-800 bg-gray-900 border-gray-600'} rounded-md`}>
                         {key} {data.count > 1 && data.count}
                     </li>
                 )
