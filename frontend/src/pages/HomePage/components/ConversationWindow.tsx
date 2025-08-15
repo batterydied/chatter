@@ -10,7 +10,8 @@ import type { ListRowRenderer } from 'react-virtualized'
 import forceRemeasure from '../../../utils/forceRemeasure'
 import type { Conversation } from '../homePageHelpers'
 import EmojiPicker from 'emoji-picker-react'
-import { Theme } from 'emoji-picker-react';
+import { Theme } from 'emoji-picker-react'
+import { Reactions } from './conversationWindowHelper'
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -26,6 +27,10 @@ type RawMessage = {
   isEdited: boolean,
   isReply: boolean,
   replyId: string
+  reactions: {
+    user: string
+    emoji: string,
+  }[]
 }
 
 type SerializedMessage = {
@@ -37,7 +42,11 @@ type SerializedMessage = {
   timestamp: Date,
   isEdited: boolean,
   isReply: boolean,
-  replyId: string
+  replyId: string,
+  reactions: {
+    user: string
+    emoji: string,
+  }[]
 }
 
 const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) => {
@@ -58,6 +67,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const [initialScrollDone, setInitialScrollDone] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(false)
   const [shouldOpenPicker, setShouldOpenPicker] = useState(false)
+  const [isReactSelected, setIsReactSelected] = useState(false)
 
   const subscriptionDict = useRef<Record<string, ()=>void>>({})
 
@@ -99,7 +109,8 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
           timestamp,
           isEdited: m.isEdited,
           isReply: m.isReply,
-          replyId: m.replyId
+          replyId: m.replyId,
+          reactions: m.reactions
         };
       })
     );
@@ -333,79 +344,82 @@ const handleScroll = useCallback(
               handleSelectHoverId(msg.id)
             }}
           >
-            <div>
-              <div
-                className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
-                  isReply && isHovered
-                    ? 'bg-blue-900'
-                    : isReply
-                    ? 'bg-blue-950'
-                    : isHovered
-                    ? 'bg-base-200'
-                    : 'bg-base-300'
-                } relative text-left whitespace-normal`}
-              >
-                <div className="chat-image avatar">
-                  <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
-                    <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
-                  </div>
-                </div>
-                {!isGrouped && (
-                  <div className="chat-header">
-                    <p>{msg.username}</p>
-                    <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-                  </div>
-                )}
-                <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-                  <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
-                    {repliedMessageId === '' ? null : repliedMessage ? (
-                      <>
-                        <div className="flex justify-start text-gray-400">
-                          Replying to {repliedMessage.username}
-                        </div>
-                        <div className="flex justify-start">{repliedMessage.text}</div>
-                      </>
-                    ) : (
-                      <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
-                    )}
-                  </div>
-                  {isEditingMessage ? (
-                    <div>
-                      <textarea
-                        id='edit-message'
-                        ref={textareaRef}
-                        onChange={(e) => {
-                          setEditMessageInputMessage(e.target.value)
-                        }}
-                        className="textarea w-full focus:outline-none border-0 focus:shadow-none shadow-none resize-none"
-                        value={editMessageInputMessage}
-                      />
-                      <p className="text-sm">
-                        Escape to <span className="text-accent">cancel</span>, enter to{' '}
-                        <span className="text-accent">save</span>
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="break-words whitespace-normal">
-                      {msg.text}
-                    </div>
-                  )}
+            <div
+              className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
+                isReply && isHovered
+                  ? 'bg-blue-900'
+                  : isReply
+                  ? 'bg-blue-950'
+                  : isHovered
+                  ? 'bg-base-200'
+                  : 'bg-base-300'
+              } relative text-left whitespace-normal`}
+            >
+              <div className="chat-image avatar">
+                <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
+                  <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
                 </div>
               </div>
-              {msg.isEdited && (
-                  <span
-                    className={`text-xs text-accent flex w-full ${isUser ? 'justify-end': 'justify-start'}`}
-                  >
-                    (edited)
-                  </span>
+              {!isGrouped && (
+                <div className="chat-header">
+                  <p>{msg.username}</p>
+                  <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
+                </div>
               )}
+              <Reactions appUserId={userId} reactions={msg.reactions}/>
+
+              <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+                <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
+                  {repliedMessageId === '' ? null : repliedMessage ? (
+                    <>
+                      <div className="flex justify-start text-gray-400">
+                        Replying to {repliedMessage.username}
+                      </div>
+                      <div className="flex justify-start">{repliedMessage.text}</div>
+                    </>
+                  ) : (
+                    <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
+                  )}
+                </div>
+      
+                {isEditingMessage ? (
+                  <div>
+                    <textarea
+                      id='edit-message'
+                      ref={textareaRef}
+                      onChange={(e) => {
+                        setEditMessageInputMessage(e.target.value)
+                      }}
+                      className="textarea w-full focus:outline-none border-0 focus:shadow-none shadow-none resize-none"
+                      value={editMessageInputMessage}
+                    />
+                    <p className="text-sm">
+                      Escape to <span className="text-accent">cancel</span>, enter to{' '}
+                      <span className="text-accent">save</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="break-words whitespace-normal">
+                    {msg.text}
+                  </div>
+                )}
+              </div>
             </div>
-            
+
+            {msg.isEdited && (
+                <span
+                  className={`text-xs text-accent flex w-full ${isUser ? 'justify-end': 'justify-start'}`}
+                >
+                  (edited)
+                </span>
+            )}
+    
             {isHovered && (
               <div className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center">
                 <button
                   onMouseEnter={() => setHoveredIcon('react')}
                   onMouseLeave={() => setHoveredIcon(null)}
+                  onClick={()=>setIsReactSelected(true)}
                   className={`cursor-pointer ${
                     hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'
                   } rounded-md p-1`}
@@ -501,6 +515,7 @@ const handleScroll = useCallback(
         }
 
         const data = snapshot.data();
+
         const [serialized] = await serializeMessages([{
           id: snapshot.id,
           createdAt: data.createdAt,
@@ -510,6 +525,7 @@ const handleScroll = useCallback(
           isEdited: data.isEdited,
           isReply: data.isReply,
           replyId: data.replyId,
+          reactions: data.reactions
         }], db);
 
         subscriptionDict.current[msg.id] = unsub
@@ -573,7 +589,8 @@ const handleScroll = useCallback(
           type: data.type,
           isEdited: data.isEdited,
           isReply: data.isReply,
-          replyId: data.replyId
+          replyId: data.replyId,
+          reactions: data.reactions
         };
       });
 
@@ -637,7 +654,14 @@ const handleScroll = useCallback(
     )
   } 
   return (
-    <div className='h-full w-full flex flex-col'>
+    <div className='h-full w-full flex flex-col relative'>
+        {isReactSelected && 
+            <div className="absolute inset-0 z-[99999] flex items-center justify-center" onClick={()=>setIsReactSelected(false)}>
+                <div onClick={(e)=>e.stopPropagation()}>
+                  <EmojiPicker />
+                </div>
+            </div>
+        }
         <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
           <div className="avatar">
             <div className="w-6 rounded-full">
@@ -647,7 +671,7 @@ const handleScroll = useCallback(
           <div className='ml-2 text-white'>{conversation.name}</div>
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
-        <div className='w-full h-screen'>
+        <div className='w-full h-screen relative'>
           <AutoSizer>
             {({width, height})=>
               <List

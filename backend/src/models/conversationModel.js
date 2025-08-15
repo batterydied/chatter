@@ -8,7 +8,7 @@ const ConversationSchema = z.object({
     lastMessageTime: z.any().optional(),
     name: z.string().default(''),
     hiddenBy: z.array(z.string()),
-    directConversationId: z.string()
+    directConversationId: z.string(),
 })
 
 export default ConversationSchema

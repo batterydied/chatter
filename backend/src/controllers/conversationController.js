@@ -13,7 +13,7 @@ class ConversationController{
             participants,
             createdAt: serverTimestamp(),
             hiddenBy: [],
-            directConversationId: isDirect ? [...participants].sort().join('_') : ''
+            directConversationId: isDirect ? [...participants].sort().join('_') : '',
         }
 
         try{
@@ -23,7 +23,7 @@ class ConversationController{
                 participants: conversation.participants,
                 createdAt: conversation.createdAt,
                 hiddenBy: conversation.hiddenBy,
-                directConversationId: conversation.directConversationId
+                directConversationId: conversation.directConversationId,
             }
             const docRef = await addDoc(collectionRef, createdField)
             const docSnapshot = await getDoc(docRef)

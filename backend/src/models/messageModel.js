@@ -11,7 +11,8 @@ const MessageSchema = z.object({
     updatedAt: z.any().optional(),
     isEdited: z.boolean(),
     isReply: z.boolean(),
-    replyId: z.string()
+    replyId: z.string(),
+    reactions: z.array()
 });
 
 export default MessageSchema

@@ -61,7 +61,8 @@ class MessageController{
                 createdAt: serverTimestamp(),
                 isEdited: false,
                 isReply,
-                replyId
+                replyId,
+                reactions: []
             }
 
             MessageSchema.parse(rawMessage)
