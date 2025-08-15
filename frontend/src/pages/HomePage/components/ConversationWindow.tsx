@@ -52,6 +52,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const [isNearBottom, setIsNearBottom] = useState(false)
   const [shouldOpenPicker, setShouldOpenPicker] = useState(false)
   const [isReactSelected, setIsReactSelected] = useState(false)
+  const [selectedMessageId, setSelectedMessageId] = useState('')
 
   const subscriptionDict = useRef<Record<string, ()=>void>>({})
 
@@ -266,6 +267,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     setMessages(updatedMessages)
     const msgRef = doc(db, 'conversations', conversation.id, 'messages', msgId)
     updateDoc(msgRef, {reactions: updatedReactions})
+    forceRemeasure(cellMeasurerCache, listRef)
   }
 
   const handleDecrement = (emoji: string, msgId: string) => {
@@ -280,42 +282,49 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     setMessages(updatedMessages)
     const msgRef = doc(db, 'conversations', conversation.id, 'messages', msgId)
     updateDoc(msgRef, {reactions: updatedReactions})
+    forceRemeasure(cellMeasurerCache, listRef)
   }
-const handleScroll = useCallback(
-  async ({scrollTop, clientHeight, scrollHeight}:{scrollTop: number, clientHeight: number, scrollHeight: number}) => {
-    if (!initialScrollDone || !listRef.current || loadingMore || !hasMore) return;
-    
-    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
-    const threshold = 75;
-    setIsNearBottom(distanceFromBottom < threshold);
 
-    if (scrollTop < 150) {
-      setLoadingMore(true);
-      const list = listRef.current
-      const moreMessages = await fetchMessages(15, earliestMessageId);
-      if(!moreMessages) return 
-      const newEarliestId = moreMessages.length > 0 ? moreMessages[0].id : earliestMessageId;
-      const newMessages = [...moreMessages, ...messages];
+  const handleReact = (emoji: string) => {
+    handleIncrement(emoji, selectedMessageId)
+    setSelectedMessageId('')
+    setIsReactSelected(false)
+  }
+  const handleScroll = useCallback(
+    async ({scrollTop, clientHeight, scrollHeight}:{scrollTop: number, clientHeight: number, scrollHeight: number}) => {
+      if (!initialScrollDone || !listRef.current || loadingMore || !hasMore) return;
+      
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+      const threshold = 75;
+      setIsNearBottom(distanceFromBottom < threshold);
 
-      const addedHeight = moreMessages.reduce((sum, _, i) => {
-        return sum + cellMeasurerCache.current.rowHeight({ index: i })
-      }, 0);
+      if (scrollTop < 150) {
+        setLoadingMore(true);
+        const list = listRef.current
+        const moreMessages = await fetchMessages(15, earliestMessageId);
+        if(!moreMessages) return 
+        const newEarliestId = moreMessages.length > 0 ? moreMessages[0].id : earliestMessageId;
+        const newMessages = [...moreMessages, ...messages];
 
-      setMessages(newMessages);
-      setEarliestMessageId(newEarliestId);
-      cellMeasurerCache.current.clearAll();
+        const addedHeight = moreMessages.reduce((sum, _, i) => {
+          return sum + cellMeasurerCache.current.rowHeight({ index: i })
+        }, 0);
 
-      requestAnimationFrame(() => {
-        list.recomputeRowHeights();
+        setMessages(newMessages);
+        setEarliestMessageId(newEarliestId);
+        cellMeasurerCache.current.clearAll();
+
         requestAnimationFrame(() => {
-          listRef.current?.scrollToPosition(scrollTop + addedHeight);
-          setLoadingMore(false);
+          list.recomputeRowHeights();
+          requestAnimationFrame(() => {
+            listRef.current?.scrollToPosition(scrollTop + addedHeight);
+            setLoadingMore(false);
+          });
         });
-      });
-    }
-  },
-  [fetchMessages, hasMore, loadingMore, earliestMessageId, initialScrollDone, messages]
-);
+      }
+    },
+    [fetchMessages, hasMore, loadingMore, earliestMessageId, initialScrollDone, messages]
+  );
 
   const renderMessages: ListRowRenderer = ({ index, key, parent, style }) => {
   const msg = messages[index]
@@ -437,7 +446,10 @@ const handleScroll = useCallback(
                 <button
                   onMouseEnter={() => setHoveredIcon('react')}
                   onMouseLeave={() => setHoveredIcon(null)}
-                  onClick={()=>setIsReactSelected(true)}
+                  onClick={()=>{
+                    setIsReactSelected(true)
+                    setSelectedMessageId(msg.id)
+                  }}
                   className={`cursor-pointer ${
                     hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'
                   } rounded-md p-1`}
@@ -677,7 +689,7 @@ const handleScroll = useCallback(
         {isReactSelected && 
             <div className="absolute inset-0 z-[99999] flex items-center justify-center" onClick={()=>setIsReactSelected(false)}>
                 <div onClick={(e)=>e.stopPropagation()}>
-                  <EmojiPicker />
+                  <EmojiPicker onEmojiClick={(e)=>handleReact(e.emoji)}/>
                 </div>
             </div>
         }
