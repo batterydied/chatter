@@ -7,13 +7,14 @@ class ConversationController{
     async createConversation(req, res){
         const collectionRef = collection(db, 'conversations')
 
-        const { participants, name, isDirect } = req.body
+        const { participants, name, isDirect, pfpFilePath } = req.body
         const conversation = {
             name,
             participants,
             createdAt: serverTimestamp(),
             hiddenBy: [],
             directConversationId: isDirect ? [...participants].sort().join('_') : '',
+            pfpFilePath
         }
 
         try{
@@ -24,6 +25,7 @@ class ConversationController{
                 createdAt: conversation.createdAt,
                 hiddenBy: conversation.hiddenBy,
                 directConversationId: conversation.directConversationId,
+                pfpFilePath: conversation.pfpFilePath ?? ''
             }
             const docRef = await addDoc(collectionRef, createdField)
             const docSnapshot = await getDoc(docRef)

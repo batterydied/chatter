@@ -9,6 +9,7 @@ const ConversationSchema = z.object({
     name: z.string().default(''),
     hiddenBy: z.array(z.string()),
     directConversationId: z.string(),
+    pfpFilePath: z.string(),
 })
 
 export default ConversationSchema

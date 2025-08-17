@@ -720,7 +720,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
           <div className="avatar">
             <div className="w-6 rounded-full">
-              <img src={getPfp(conversationPfpFilePath)} />
+              <img src={supabase.storage.from('avatars').getPublicUrl(conversationPfpFilePath).data.publicUrl} />
             </div>
           </div>
           <div className='ml-2 text-white'>{conversationName}</div>
