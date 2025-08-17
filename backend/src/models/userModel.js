@@ -5,7 +5,8 @@ const UserSchema = z.object({
     email: z.string().email(),
     createdAt: z.any().optional(),
     uid: z.string(),
-    isOnline: z.boolean()
+    isOnline: z.boolean(),
+    pfpFilePath: z.string()
 })
 
 export default UserSchema

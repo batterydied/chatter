@@ -37,6 +37,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [errorMessage, setErrorMessage] = useState('')
     const [outgoingRequests, setOutgoingRequests] = useState<OutgoingRequest[]>([])
     const [modalOpen, setModalOpen] = useState(false)
+    const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
 
     const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const listRef = useRef<List>(null)
@@ -59,7 +60,9 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         const queryRef = query(collection(db, 'relations'), where('to', '==', userId), where('status', '==', 'friend'))
         const unsub = onSnapshot(queryRef, async (snapshot)=>{
             const docs = snapshot.docs
-            setFriends(await serializeFriends(docs))
+            const friends = await serializeFriends(docs)
+            setFriends(friends)
+            setOnlineFriends(friends.filter((f)=>f.isOnline))
             forceRemeasure(cellMeasurerCache, listRef)
         })
         return unsub
@@ -200,8 +203,12 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     }
 
     const renderFriends: ListRowRenderer = ({ index, key, parent, style }) => {
-        const friend = friends[index]
-        if(selectedOnline && !friend.isOnline) return null
+        let friend: Friend
+        if(!selectedOnline){
+            friend = friends[index]
+        }else{
+            friend = onlineFriends[index]
+        }
         return (
             <CellMeasurer
                 key={key}
@@ -305,6 +312,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             const unsub = onSnapshot(friendRef, async (snapshot)=>{
                 if (!snapshot.exists()){
                     setFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
+                    setOnlineFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
                     forceRemeasure(cellMeasurerCache, listRef)
                     return
                 }
@@ -321,6 +329,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
                 setFriends((prev)=>
                 prev.map((f)=>(f.friendId === friend.friendId ? updatedFriend : f)))
+
+                setOnlineFriends(friends.filter((f)=>f.isOnline))
 
                 forceRemeasure(cellMeasurerCache, listRef)
     
@@ -352,7 +362,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     id: data.conversationId,
                     name: await serializeName(data.name, data.participants, userId),
                     hiddenBy: data.hiddenBy,
-                    participants: data.participants
+                    participants: data.participants,
+                    pfpFilePath: data.pfpFilePath
                 }
                 setSelectedConversation(conversation)
             }else{
@@ -362,7 +373,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     id: selectedDoc.id,
                     name: await serializeName(data.name, data.participants, userId),
                     hiddenBy: data.hiddenBy,
-                    participants: data.participants
+                    participants: data.participants,
+                    pfpFilePath: data.pfpFilePath
                 })
                 await updateDoc(selectedDoc.ref, {hiddenBy: selectedDoc.data().hiddenBy.filter((id: string) => id !== userId)})
             }
@@ -391,7 +403,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                         height={height}
                         rowHeight={cellMeasurerCache.current.rowHeight}
                         deferredMeasurementCache={cellMeasurerCache.current}
-                        rowCount={friends.length}
+                        rowCount={selectedOnline ? onlineFriends.length : friends.length}
                         rowRenderer={renderFriends}
                         ref={listRef}
                     />

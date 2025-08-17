@@ -9,7 +9,8 @@ class UserController{
             uid: req.body.uid,
             email: req.body.email,
             createdAt: serverTimestamp(),
-            isOnline: true
+            isOnline: true,
+            pfpFilePath: ''
         }
         try{
             UserSchema.parse(user);

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore'
-import type { Firestore, Timestamp } from 'firebase/firestore'
+import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore'
+import type { Timestamp } from 'firebase/firestore'
 import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
@@ -12,6 +12,7 @@ import type { Conversation } from '../homePageHelpers'
 import EmojiPicker from 'emoji-picker-react'
 import { Theme } from 'emoji-picker-react'
 import { Reactions, type Reaction, type SerializedMessage } from './conversationWindowHelper'
+import { supabase } from '../../../config/supabase'
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -19,17 +20,17 @@ type ConversationWindowProps = {
 }
 
 type RawMessage = {
-  id: string
-  createdAt: string | Timestamp //if you get it from backend api, it's a string; if you use firebase snapshot, it's a timestamp
-  senderId: string
-  text: string
-  type: string
+  id: string,
+  createdAt: string | Timestamp, //if you get it from backend api, it's a string; if you use firebase snapshot, it's a timestamp
+  senderId: string,
+  text: string,
+  type: string,
   isEdited: boolean,
   isReply: boolean,
-  replyId: string
+  replyId: string,
   reactions: {
-    user: string
-    emoji: string,
+    user: string,
+    emoji: string
   }[]
 }
 
@@ -46,13 +47,17 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const [editMessage, setEditMessage] = useState<SerializedMessage | null>(null)
   const [editMessageInputMessage, setEditMessageInputMessage] = useState('')
   const [replyMessage, setReplyMessage] = useState<SerializedMessage | null>(null)
-  const [replyUsername, setReplyUsername] = useState<string | null>(null)
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false)
   const [initialScrollDone, setInitialScrollDone] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(false)
   const [shouldOpenPicker, setShouldOpenPicker] = useState(false)
   const [isReactSelected, setIsReactSelected] = useState(false)
   const [selectedMessageId, setSelectedMessageId] = useState('')
+  const [conversationName, setConversationName] = useState('')
+  const [conversationPfpFilePath, setConversationPfpFilePath] = useState('')
+
+  const [usernameRecord, setUsernameRecord] = useState<Record<string, string>>({'': 'Deleted User'})
+  const [pfpRecord, setPfpRecord] = useState<Record<string, string>>({'': 'default/default_user.png'})
 
   const subscriptionDict = useRef<Record<string, ()=>void>>({})
 
@@ -73,33 +78,37 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     }
   }, []);
 
-  const serializeMessages = async (rawMessages: RawMessage[], db: Firestore) => {
+  const serializeMessages = async (rawMessages: RawMessage[]) => {
     return await Promise.all(
-      rawMessages.map(async (m) => {
-        const docRef = doc(db, 'users', m.senderId);
-        const docSnap = await getDoc(docRef);
-        const username = docSnap.exists()
-          ? docSnap.data().username
-          : 'Deleted User';
-        
-        
+      rawMessages.map((m) => {
         const timestamp = typeof m.createdAt === 'string' ? new Date(m.createdAt) : m.createdAt.toDate()
         const messageTime = formatMessageTime(timestamp)
         return {
           id: m.id,
           text: m.text,
-          username,
           messageTime,
           senderId: m.senderId,
           timestamp,
           isEdited: m.isEdited,
           isReply: m.isReply,
           replyId: m.replyId,
-          reactions: m.reactions
+          reactions: m.reactions,
         };
       })
     );
   }
+
+  useEffect(()=>{
+    const unsub = onSnapshot(doc(db, 'conversations', conversation.id), (snapshot)=>{
+      if(!snapshot.exists()) return
+      const data = snapshot.data()
+      setConversationPfpFilePath((prev)=> data.pfpFilePath == prev ? prev : data.pfpFilePath)
+      setConversationName((prev)=> data.name == prev ? prev : data.name)
+    })
+
+    return unsub
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation])
 
   const fetchMessages = useCallback(async (size: number, prevMessageId: string | null) => {
     const params = {size, prevMessageId}
@@ -112,12 +121,38 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       const rawMessages: RawMessage[] = res.data.messages
       setHasMore(!res.data.noMore)
 
-      const serialized = await serializeMessages(rawMessages, db)
+      const serialized = await serializeMessages(rawMessages)
 
       return serialized
     } catch (e) {
       console.error('fetchMessages error', e)
       return []
+    }
+  }, [conversation])
+
+  useEffect(() => {
+    const unsubscribers: (() => void)[] = []
+
+    conversation.participants.forEach(participantId => {
+      const userRef = doc(db, 'users', participantId)
+      const unsubscribe = onSnapshot(userRef, snapshot => {
+        if (snapshot.exists()) {
+          const data = snapshot.data()
+          setPfpRecord(prev => ({
+            ...prev,
+            [participantId]: data.pfpFilePath
+          }))
+          setUsernameRecord(prev => ({
+            ...prev,
+            [participantId]: data.username 
+          }))
+        }
+      })
+      unsubscribers.push(unsubscribe)
+    })
+
+    return () => {
+      unsubscribers.forEach(unsub => unsub())
     }
   }, [conversation])
 
@@ -204,25 +239,6 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
 
     forceRemeasure(cellMeasurerCache, listRef)
   }, [conversation.id])
-
-  useEffect(() => {
-    if (!replyMessage) {
-      setReplyUsername(null);
-      return;
-    }
-
-    const fetchUsername = async () => {
-      const userRef = doc(db, 'users', replyMessage.senderId);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        setReplyUsername(userSnap.data().username);
-      } else {
-        setReplyUsername('Deleted User');
-      }
-    };
-
-    fetchUsername();
-  }, [replyMessage]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -326,6 +342,15 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     [fetchMessages, hasMore, loadingMore, earliestMessageId, initialScrollDone, messages]
   );
 
+  const getPfp = (id: string) => {
+    const url =  pfpRecord[id] || 'default/default_user.png'
+    return supabase.storage.from('avatars').getPublicUrl(url).data.publicUrl
+  }
+
+  const getUsername = (id: string) => {
+    return usernameRecord[id] || 'Deleted User'
+  }
+
   const renderMessages: ListRowRenderer = ({ index, key, parent, style }) => {
   const msg = messages[index]
   const prev = index > 0 ? messages[index - 1] : null
@@ -377,12 +402,12 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
             >
               <div className="chat-image avatar">
                 <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
-                  <span className="text-xl">{msg.senderId.slice(0, 2)}</span>
+                  <img src={getPfp(msg.senderId)}/>
                 </div>
               </div>
               {!isGrouped && (
                 <div className="chat-header">
-                  <p>{msg.username}</p>
+                  <p>{getUsername(msg.senderId)}</p>
                   <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
                 </div>
               )}
@@ -391,7 +416,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
                   {repliedMessageId === '' ? null : repliedMessage ? (
                     <>
                       <div className="flex justify-start text-gray-400">
-                        Replying to {repliedMessage.username}
+                        Replying to {getUsername(repliedMessage.senderId)}
                       </div>
                       <div className="flex justify-start">{repliedMessage.text}</div>
                     </>
@@ -545,7 +570,6 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         }
 
         const data = snapshot.data();
-        console.log(data.reactions)
         const [serialized] = await serializeMessages([{
           id: snapshot.id,
           createdAt: data.createdAt,
@@ -555,8 +579,8 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
           isEdited: data.isEdited,
           isReply: data.isReply,
           replyId: data.replyId,
-          reactions: data.reactions
-        }], db);
+          reactions: data.reactions,
+        }]);
 
         subscriptionDict.current[msg.id] = unsub
         let updated = false
@@ -621,11 +645,11 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
           isEdited: data.isEdited,
           isReply: data.isReply,
           replyId: data.replyId,
-          reactions: data.reactions
+          reactions: data.reactions,
         };
       });
 
-      const serializedMessages = await serializeMessages(rawMessages, db);
+      const serializedMessages = await serializeMessages(rawMessages);
       
       setMessages((prev) => {
         const newMessage = serializedMessages[0];
@@ -696,10 +720,10 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
           <div className="avatar">
             <div className="w-6 rounded-full">
-              <img src="https://img.daisyui.com/images/profile/demo/gordon@192.webp" />
+              <img src={getPfp(conversationPfpFilePath)} />
             </div>
           </div>
-          <div className='ml-2 text-white'>{conversation.name}</div>
+          <div className='ml-2 text-white'>{conversationName}</div>
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>
@@ -724,9 +748,9 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       <div>
         {replyMessage && 
           <div
-            className={`text-sm flex justify-between ${replyUsername ? 'opacity-100' : 'opacity-0'}`}
+            className={`text-sm flex justify-between ${replyMessage.senderId ? 'opacity-100' : 'opacity-0'}`}
           >
-            Replying to {replyUsername}<button onClick={()=>setReplyMessage(null)}>X</button>
+            Replying to {getUsername(replyMessage.senderId)}<button onClick={()=>setReplyMessage(null)}>X</button>
           </div>}
         <div className='relative'>
           <div className="absolute right-0 bottom-full" ref={pickerRef}>
@@ -780,7 +804,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
           <h3 className="text-md">Are you sure you want to delete this message?</h3>
           <div className='chat chat-end bg-base-100 p-2 m-6 rounded-md'>
               <div className="chat-header">
-                {deleteMessage?.username}
+                {getUsername(deleteMessage?.senderId || '')}
                 <time className="text-xs opacity-50 ml-2">{deleteMessage?.messageTime}</time>
               </div>
               <div className={`chat-bubble mt-3`}>

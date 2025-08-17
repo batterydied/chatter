@@ -12,6 +12,7 @@ import { db } from '../../config/firebase'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
 import axios from 'axios'
 import { toast } from 'sonner'
+import { supabase } from '../../config/supabase'
 
 type HomeProps = {
     user: User | null
@@ -33,7 +34,6 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
     const [modalOpen, setModalOpen] = useState(false)
-
     const requestCellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const requestListRef = useRef<List>(null)
 
@@ -248,6 +248,13 @@ const HomePage = ({user, logOut} : HomeProps) => {
         setModalOpen(true)
     }
 
+    const getPfp = (filePath: string) => {
+        if(!filePath){
+            return supabase.storage.from('avatars').getPublicUrl('default/default_user.png').data.publicUrl
+        }
+        return supabase.storage.from('avatars').getPublicUrl(filePath).data.publicUrl
+    }
+
     return (
         <div className='w-full h-full flex justify-center items-center'>
             {user && user.email ? (
@@ -292,7 +299,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <div className='flex flex-row items-center'>
                                     <div className="avatar avatar-online avatar-placeholder">
                                         <div className="bg-neutral text-base-content w-16 rounded-full">
-                                            <span className="text-xl">{appUser?.username.slice(0, 2)}</span>
+                                            <img src={getPfp(appUser!.pfpFilePath)} />
                                         </div>
                                     </div>
                                     <div className='pl-2'>

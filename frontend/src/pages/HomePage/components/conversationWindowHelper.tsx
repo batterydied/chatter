@@ -20,7 +20,6 @@ type SerializedReaction = {
 export type SerializedMessage = {
   id: string
   text: string
-  username: string
   messageTime: string,
   senderId: string,
   timestamp: Date,
@@ -30,7 +29,7 @@ export type SerializedMessage = {
   reactions: {
     user: string
     emoji: string,
-  }[]
+  }[],
 }
 
 export const Reactions = ({msgId, reactions, appUserId, handleIncrement, handleDecrement}: ReactionsProps) => {

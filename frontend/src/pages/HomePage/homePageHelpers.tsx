@@ -6,14 +6,16 @@ export type AppUser = {
     id: string,
     createdAt: string,
     username: string,
-    email: string
+    email: string,
+    pfpFilePath: string
 }
 
 export type Conversation = {
     id: string,
     name: string,
     hiddenBy: string[],
-    participants: string[]
+    participants: string[],
+    pfpFilePath: string
 }
 
 export const fetchUserFromDB = async (
@@ -73,7 +75,8 @@ export const subscribeConversation = (
                 id: doc.id,
                 name: await serializeName(data.name, data.participants, userId),
                 hiddenBy: data.hiddenBy,
-                participants: data.participants
+                participants: data.participants,
+                pfpFilePath: data.pfpFilePath
             }
         }))
         setter(conversations)
