@@ -363,7 +363,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     name: await serializeName(data.name, data.participants, userId),
                     hiddenBy: data.hiddenBy,
                     participants: data.participants,
-                    pfpFilePath: data.pfpFilePath
+                    pfpFilePath: data.pfpFilePath,
+                    directConversationId: data.directConversationId
                 }
                 setSelectedConversation(conversation)
             }else{
@@ -374,7 +375,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     name: await serializeName(data.name, data.participants, userId),
                     hiddenBy: data.hiddenBy,
                     participants: data.participants,
-                    pfpFilePath: data.pfpFilePath
+                    pfpFilePath: data.pfpFilePath,
+                    directConversationId: data.directConversationId
                 })
                 await updateDoc(selectedDoc.ref, {hiddenBy: selectedDoc.data().hiddenBy.filter((id: string) => id !== userId)})
             }

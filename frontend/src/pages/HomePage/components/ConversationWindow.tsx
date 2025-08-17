@@ -34,6 +34,11 @@ type RawMessage = {
   }[]
 }
 
+type Recipient = {
+  pfpFilePath: string,
+  username: string
+}
+
 const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,6 +60,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const [selectedMessageId, setSelectedMessageId] = useState('')
   const [conversationName, setConversationName] = useState('')
   const [conversationPfpFilePath, setConversationPfpFilePath] = useState('')
+  const [recipient, setRecipient] = useState<Recipient | null>(null)
 
   const [usernameRecord, setUsernameRecord] = useState<Record<string, string>>({'': 'Deleted User'})
   const [pfpRecord, setPfpRecord] = useState<Record<string, string>>({'': 'default/default_user.png'})
@@ -138,6 +144,9 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       const unsubscribe = onSnapshot(userRef, snapshot => {
         if (snapshot.exists()) {
           const data = snapshot.data()
+          if(conversation.directConversationId && participantId != userId){
+            setRecipient({pfpFilePath: data.pfpFilePath, username: data.username})
+          }
           setPfpRecord(prev => ({
             ...prev,
             [participantId]: data.pfpFilePath
@@ -154,7 +163,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     return () => {
       unsubscribers.forEach(unsub => unsub())
     }
-  }, [conversation])
+  }, [conversation, userId])
 
   useEffect(()=>{
     for (const key in subscriptionDict.current) {
@@ -342,9 +351,13 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     [fetchMessages, hasMore, loadingMore, earliestMessageId, initialScrollDone, messages]
   );
 
-  const getPfp = (id: string) => {
+  const getPfpById = (id: string) => {
     const url =  pfpRecord[id] || 'default/default_user.png'
     return supabase.storage.from('avatars').getPublicUrl(url).data.publicUrl
+  }
+
+  const getPfpByFilePath = (filepath: string) => {
+    return supabase.storage.from('avatars').getPublicUrl(filepath).data.publicUrl
   }
 
   const getUsername = (id: string) => {
@@ -402,7 +415,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
             >
               <div className="chat-image avatar">
                 <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
-                  <img src={getPfp(msg.senderId)}/>
+                  <img src={getPfpById(msg.senderId)}/>
                 </div>
               </div>
               {!isGrouped && (
@@ -720,10 +733,10 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
           <div className="avatar">
             <div className="w-6 rounded-full">
-              <img src={supabase.storage.from('avatars').getPublicUrl(conversationPfpFilePath).data.publicUrl} />
+              <img src={recipient ? getPfpByFilePath(recipient.pfpFilePath) : getPfpByFilePath(conversationPfpFilePath)} />
             </div>
           </div>
-          <div className='ml-2 text-white'>{conversationName}</div>
+          <div className='ml-2 text-white'>{recipient ? recipient.username : conversationName}</div>
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>

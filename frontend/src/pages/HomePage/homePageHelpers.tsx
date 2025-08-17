@@ -15,7 +15,8 @@ export type Conversation = {
     name: string,
     hiddenBy: string[],
     participants: string[],
-    pfpFilePath: string
+    pfpFilePath: string,
+    directConversationId: string
 }
 
 export const fetchUserFromDB = async (
@@ -76,7 +77,8 @@ export const subscribeConversation = (
                 name: await serializeName(data.name, data.participants, userId),
                 hiddenBy: data.hiddenBy,
                 participants: data.participants,
-                pfpFilePath: data.pfpFilePath
+                pfpFilePath: data.pfpFilePath,
+                directConversationId: data.directConversationId
             }
         }))
         setter(conversations)
