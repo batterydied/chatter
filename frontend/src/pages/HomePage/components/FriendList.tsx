@@ -5,8 +5,7 @@ import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, Do
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
 import { RemoveUserIcon } from "../../../assets/icons"
 import { toast } from "sonner"
-import forceRemeasure from "../../../utils/forceRemeasure"
-import { serializeName, type Conversation } from "../homePageHelpers"
+import { getPfpByFilePath, serializeName, type Conversation } from "../homePageHelpers"
 
 type FriendListProps = {
     userId: string,
@@ -17,7 +16,8 @@ export type Friend = {
     relationshipId: string,
     friendId: string,
     username: string,
-    isOnline: boolean
+    isOnline: boolean,
+    pfpFilePath: string
 }
 
 type OutgoingRequest = {
@@ -39,7 +39,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [modalOpen, setModalOpen] = useState(false)
     const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
 
-    const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
+    const cacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const listRef = useRef<List>(null)
     const friendDict = useRef<Record<string, ()=>void>>({})
 
@@ -58,15 +58,26 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
     useEffect(()=>{
         const queryRef = query(collection(db, 'relations'), where('to', '==', userId), where('status', '==', 'friend'))
-        const unsub = onSnapshot(queryRef, async (snapshot)=>{
-            const docs = snapshot.docs
-            const friends = await serializeFriends(docs)
-            setFriends(friends)
-            setOnlineFriends(friends.filter((f)=>f.isOnline))
-            forceRemeasure(cellMeasurerCache, listRef)
-        })
+        const unsub = onSnapshot(queryRef, (snapshot) => {
+            snapshot.docChanges().forEach(async (change) => {
+                const [friend] = await serializeFriends([change.doc]);
+                setFriends((prev) => {
+                    const idx = prev.findIndex(f => f.friendId === friend.friendId);
+                    if (idx === -1) return [...prev, friend];
+                    const newArr = [...prev];
+                    newArr[idx] = friend;
+                    return newArr;
+                });
+
+                const rowIndex = friends.findIndex(f => f.friendId === friend.friendId);
+                if (rowIndex >= 0) {
+                    listRef.current?.recomputeRowHeights(rowIndex);
+                }
+            });
+        });
+
         return unsub
-    }, [userId])
+    }, [friends, userId])
 
     const handleRemoveConfirmation = (friend: Friend) => {
         setRemoveFriend(friend);
@@ -82,7 +93,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         return (
             <CellMeasurer
                 key={key}
-                cache={cellMeasurerCache.current}
+                cache={cacheRef.current}
                 parent={parent}
                 columnIndex={0}
                 rowIndex={index}
@@ -194,9 +205,11 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     to: friendId
                 }
             })
+            const idx = friends.findIndex((f)=>f.friendId == friendId)
+            if(idx >= 0) cacheRef.current.clear(idx, 0)
             setFriends((prev) => prev.filter((f) => f.friendId != friendId))
             setRemoveFriend(null)
-            forceRemeasure(cellMeasurerCache, listRef)
+
         }catch{
             toast.error('Could not remove friend, try again later.')
         }
@@ -212,7 +225,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         return (
             <CellMeasurer
                 key={key}
-                cache={cellMeasurerCache.current}
+                cache={cacheRef.current}
                 parent={parent}
                 columnIndex={0}
                 rowIndex={index}
@@ -222,7 +235,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     <div onClick={async ()=> await openConversation(friend.friendId, userId)} className='rounded-none list-row cursor-pointer hover:bg-neutral hover:rounded-xl flex justify-start items-center overflow-hidden'>
                         <div className={`avatar ${friend.isOnline ? 'avatar-online' : 'avatar-offline'}`}>
                             <div className="w-10 rounded-full">
-                                <img src="https://img.daisyui.com/images/profile/demo/gordon@192.webp" />
+                                <img src={getPfpByFilePath(friend.pfpFilePath)} />
                             </div>
                         </div>
                         <p>{friend.username}</p>
@@ -310,10 +323,11 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
             const friendRef = doc(db, 'users',  friend.friendId);
             const unsub = onSnapshot(friendRef, async (snapshot)=>{
+                const idx = friends.findIndex((f)=>f.friendId == friend.friendId)
                 if (!snapshot.exists()){
+                    if(idx >= 0) cacheRef.current.clear(idx, 0)
                     setFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
                     setOnlineFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
-                    forceRemeasure(cellMeasurerCache, listRef)
                     return
                 }
                 
@@ -323,7 +337,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     relationshipId: friend.relationshipId,
                     friendId: friend.friendId,
                     username: data.username,
-                    isOnline: data.isOnline
+                    isOnline: data.isOnline,
+                    pfpFilePath: data.pfpFilePath
                 }
                 
 
@@ -332,7 +347,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
                 setOnlineFriends(friends.filter((f)=>f.isOnline))
 
-                forceRemeasure(cellMeasurerCache, listRef)
+                if(idx >=0) listRef.current?.recomputeRowHeights(idx)
     
             })
             friendDict.current[friend.friendId] = unsub
@@ -382,7 +397,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             }
         }catch(e){
             if(axios.isAxiosError(e)){
-                toast.error(e.message)
+                toast.error(e.response?.data.message)
+                console.log(e.response?.data.error)
             }else{
                 console.log(e)
             }
@@ -403,8 +419,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     <List
                         width={width}
                         height={height}
-                        rowHeight={cellMeasurerCache.current.rowHeight}
-                        deferredMeasurementCache={cellMeasurerCache.current}
+                        rowHeight={cacheRef.current.rowHeight}
+                        deferredMeasurementCache={cacheRef.current}
                         rowCount={selectedOnline ? onlineFriends.length : friends.length}
                         rowRenderer={renderFriends}
                         ref={listRef}
@@ -453,8 +469,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                                 <List
                                     width={width}
                                     height={height}
-                                    rowHeight={cellMeasurerCache.current.rowHeight}
-                                    deferredMeasurementCache={cellMeasurerCache.current}
+                                    rowHeight={cacheRef.current.rowHeight}
+                                    deferredMeasurementCache={cacheRef.current}
                                     rowCount={outgoingRequests.length}
                                     rowRenderer={renderRequests}
                                     ref={listRef}
@@ -482,7 +498,8 @@ const serializeFriends = async (docSnapshots: QueryDocumentSnapshot[]) => {
             relationshipId: snapshot.id,
             friendId: data.from,
             username: userData.username,
-            isOnline: userData.isOnline
+            isOnline: userData.isOnline,
+            pfpFilePath: userData.pfpFilePath
         }
     }))).filter((f)=>f !== null)
 }

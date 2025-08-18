@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
 import forceRemeasure from '../../../utils/forceRemeasure'
-import type { Conversation } from '../homePageHelpers'
+import { getPfpByFilePath, type Conversation } from '../homePageHelpers'
 import EmojiPicker from 'emoji-picker-react'
 import { Theme } from 'emoji-picker-react'
 import { Reactions, type Reaction, type SerializedMessage } from './conversationWindowHelper'
@@ -35,6 +35,7 @@ type RawMessage = {
 }
 
 type Recipient = {
+  id: string,
   pfpFilePath: string,
   username: string
 }
@@ -145,7 +146,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         if (snapshot.exists()) {
           const data = snapshot.data()
           if(conversation.directConversationId && participantId != userId){
-            setRecipient({pfpFilePath: data.pfpFilePath, username: data.username})
+            setRecipient({id: snapshot.id, pfpFilePath: data.pfpFilePath, username: data.username})
           }
           setPfpRecord(prev => ({
             ...prev,
@@ -354,10 +355,6 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const getPfpById = (id: string) => {
     const url =  pfpRecord[id] || 'default/default_user.png'
     return supabase.storage.from('avatars').getPublicUrl(url).data.publicUrl
-  }
-
-  const getPfpByFilePath = (filepath: string) => {
-    return supabase.storage.from('avatars').getPublicUrl(filepath).data.publicUrl
   }
 
   const getUsername = (id: string) => {
@@ -733,7 +730,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
           <div className="avatar">
             <div className="w-6 rounded-full">
-              <img src={recipient ? getPfpByFilePath(recipient.pfpFilePath) : getPfpByFilePath(conversationPfpFilePath)} />
+              <img src={recipient ? getPfpById(recipient.id) : getPfpByFilePath(conversationPfpFilePath)} />
             </div>
           </div>
           <div className='ml-2 text-white'>{recipient ? recipient.username : conversationName}</div>

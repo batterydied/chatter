@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { db } from '../../config/firebase'
 import { collection, where, query, onSnapshot, doc, getDoc, orderBy } from 'firebase/firestore'
+import { supabase } from '../../config/supabase'
 
 export type AppUser = {
     id: string,
@@ -104,5 +105,12 @@ export const serializeName = async (name: string, participants: string[], userId
     }else{
         return name
     }
+}
+
+export const getPfpByFilePath = (filePath: string) => {
+    if(!filePath){
+        return supabase.storage.from('avatars').getPublicUrl('default/default_user.png').data.publicUrl
+    }
+    return supabase.storage.from('avatars').getPublicUrl(filePath).data.publicUrl
 }
 
