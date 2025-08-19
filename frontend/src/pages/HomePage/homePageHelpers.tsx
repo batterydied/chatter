@@ -12,6 +12,12 @@ export type AppUser = {
     pfpFilePath: string
 }
 
+export type FriendRequest = {
+    requestId: string,
+    from: string,
+    username: string
+}
+
 export type Conversation = {
     id: string,
     name: string,

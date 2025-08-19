@@ -1,10 +1,15 @@
 @import "tailwindcss";
+
 @plugin "daisyui" {
   themes: dark;
+}
+
+@utility animate-spin-slow {
+  animation: spin 3s linear infinite;
 }
 
 html, body{
   height: 100%;
   width: 100%;
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: system-ui, Helvetica, Arial, sans-serif;
 }

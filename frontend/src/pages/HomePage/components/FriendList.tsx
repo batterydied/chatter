@@ -240,14 +240,14 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             >
                 {()=>
                 <div style={style} className='relative'>
-                    <div onClick={async ()=> await openConversation(friend.friendId, userId, friend.isOnline)} className='rounded-none list-row cursor-pointer hover:bg-neutral hover:rounded-xl flex justify-start items-center overflow-hidden'>
+                    <div onClick={async ()=> await openConversation(friend.friendId, userId, friend.isOnline)} className='group rounded-none list-row cursor-pointer hover:bg-neutral hover:rounded-xl flex justify-start items-center overflow-hidden'>
                         <div className={`avatar ${friend.isOnline ? 'avatar-online' : 'avatar-offline'}`}>
                             <div className="w-10 rounded-full">
                                 <img src={getPfpByFilePath(friend.pfpFilePath)} />
                             </div>
                         </div>
                         <p>{friend.username}</p>
-                        <div className='ml-auto hover:bg-base-300 rounded-full p-2' onClick={(e)=>{
+                        <div className='hidden group-hover:block ml-auto hover:bg-base-300 rounded-full p-2' onClick={(e)=>{
                             e.stopPropagation()
                             handleRemoveConfirmation(friend)
                         }}>

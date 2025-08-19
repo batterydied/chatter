@@ -2,27 +2,23 @@ import type { User } from 'firebase/auth'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { fetchUserFromDB, getPfpByFilePath, subscribeConversation, subscribeDirectConversation } from './homePageHelpers'
-import type { AppUser, Conversation } from './homePageHelpers'
+import type { AppUser, Conversation, FriendRequest } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
-import { CheckIcon, RequestIcon, UserIcon, XIcon } from '../../assets/icons'
+import { CheckIcon, GearsIcon, RequestIcon, UserIcon, XIcon } from '../../assets/icons'
 import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
 import axios from 'axios'
 import { toast } from 'sonner'
 import Loading from './components/Loading'
+import RequestModal from './components/RequestModal'
+import VList from './components/VList'
 
 type HomeProps = {
     user: User | null
     logOut: () => void,
-}
-
-type FriendRequest = {
-    requestId: string,
-    from: string,
-    username: string
 }
 
 const HomePage = ({user, logOut} : HomeProps) => {
@@ -34,11 +30,11 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
     const [modalOpen, setModalOpen] = useState(false)
-    const requestCellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
+    const requestCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const requestListRef = useRef<List>(null)
     const conversationRecordRef = useRef<Record<string, ()=>void>>({})
 
-    const conversationCellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
+    const conversationCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const conversationListRef = useRef<List>(null)
 
     const navigate = useNavigate();
@@ -175,7 +171,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
         return (
             <CellMeasurer
              key={key}
-             cache={conversationCellMeasurerCache.current}
+             cache={conversationCacheRef.current}
              parent={parent}
              columnIndex={0}
              rowIndex={index}>
@@ -213,7 +209,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
         return (
             <CellMeasurer
               key={key}
-              cache={requestCellMeasurerCache.current}
+              cache={requestCacheRef.current}
               parent={parent}
               columnIndex={0}
               rowIndex={index}
@@ -258,6 +254,10 @@ const HomePage = ({user, logOut} : HomeProps) => {
         setModalOpen(true)
     }
 
+    const handleOpenSetting = () => {
+        (document.getElementById('setting_modal') as HTMLDialogElement)!.showModal()
+    }
+
     return (
         <div className='w-full h-full flex justify-center items-center'>
             {user && user.email ? (
@@ -283,20 +283,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <div className='my-1 flex justify-start text-gray-600 text-sm'>
                                     Direct Messages
                                 </div>
-                                <AutoSizer>
-                                    {({width, height})=>
-                                        <List
-                                            width={width}
-                                            height={height}
-                                            rowHeight={conversationCellMeasurerCache.current.rowHeight}
-                                            deferredMeasurementCache={conversationCellMeasurerCache.current}
-                                            rowCount={visibleConversations.length}
-                                            rowRenderer={renderConversations}
-                                            ref={conversationListRef}
-                                            className='overflow-x-hidden'
-                                        />
-                                    }
-                                </AutoSizer>
+                                <VList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} rowCount={visibleConversations.length} className='overflow-x-hidden'/> 
                             </ul>
                             <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
                                 <div className='flex flex-row items-center'>
@@ -310,7 +297,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                         <p className='text-sm text-neutral-content'>ID: {appUser?.id}</p>
                                     </div>
                                 </div>
-                                <button className='btn btn-neutral' onClick={logOut}>L</button>
+                                <GearsIcon onClick={handleOpenSetting} className='hover:cursor-pointer hover:animate-spin-slow' iconColor='gray' size={32}/>
                             </div>
                         </div>
                         <div className='ml-2 p-2 w-full bg-base-300'>
@@ -322,37 +309,14 @@ const HomePage = ({user, logOut} : HomeProps) => {
                             <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
                             }
                         </div>
-                        <dialog id="request_modal" className="modal" onCancel={()=>setModalOpen(false)}>
+                        <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} setModalOpen={setModalOpen} handleDeclineAll={handleDeclineAll}/>
+
+                        <dialog id="setting_modal" className="modal">
                             <div className="modal-box">
                                 <form method="dialog">
                                     {/* if there is a button in form, it will close the modal */}
-                                    <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={()=>setModalOpen(false)}>✕</button>
-                                    <h3 className="font-bold text-lg">Incoming Requests</h3>
-                                    {friendRequests.length === 0 ?  <h3>There are no incoming requests.</h3> :
-                                    <div className='h-64'>
-                                        <AutoSizer>
-                                            {({width, height})=>
-                                            <List
-                                                width={width}
-                                                height={height}
-                                                rowHeight={requestCellMeasurerCache.current.rowHeight}
-                                                deferredMeasurementCache={requestCellMeasurerCache.current}
-                                                rowCount={friendRequests.length}
-                                                rowRenderer={renderRequests}
-                                                ref={requestListRef}
-                                            />
-                                            }           
-                                        </AutoSizer>
-                                    </div>
-                                    }
+                                    <div>hey</div>
                                 </form>
-                                {friendRequests.length !== 0 &&
-                                <div className='mt-2 flex justify-end'>
-                                    <button className='btn bg-red-500' onClick={handleDeclineAll}>
-                                        Decline All
-                                    </button>
-                                </div>
-                                }
                             </div>
                         </dialog>
                     </div>
