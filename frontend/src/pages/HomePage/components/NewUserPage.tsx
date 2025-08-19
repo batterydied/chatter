@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createUser, type AppUser } from '../homePageHelpers'
 import type { User } from 'firebase/auth'
+import truncateName from '../../../utils/truncateName'
 
 type NewUserModalProps = {
     user: User,
@@ -13,7 +14,8 @@ const NewUserModal = ({user, setIsNewUser, email, setAppUser}: NewUserModalProps
     const [username, setUsername] = useState<string>('')
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setUsername(event.target.value)
+        const truncatedName = truncateName(event.target.value)
+        setUsername(truncatedName)
     }
 
     const handleSubmit = async () => {

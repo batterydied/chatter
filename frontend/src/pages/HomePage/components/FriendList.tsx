@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, QueryDocumentSnapshot, deleteDoc, updateDoc } from 'firebase/firestore'
-import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
+import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, deleteDoc, updateDoc } from 'firebase/firestore'
+import { CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
 import { RemoveUserIcon } from "../../../assets/icons"
 import { toast } from "sonner"
 import { getPfpByFilePath, serializeName, type Conversation } from "../homePageHelpers"
 import Loading from "./Loading"
+import VList from "./VList"
+import OutgoingRequestModal from "./OutgoingRequestModal"
+import AddFriendModal from "./AddFriendModal"
+import serializeFriends from "../../../utils/serializeFriends"
+import RemoveFriendConfirmationModal from "./RemoveFriendConfirmationModal"
 
 type FriendListProps = {
     userId: string,
@@ -62,6 +67,15 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         const queryRef = query(collection(db, 'relations'), where('to', '==', userId), where('status', '==', 'friend'))
         const unsub = onSnapshot(queryRef, (snapshot) => {
             snapshot.docChanges().forEach(async (change) => {
+                if (change.type === 'removed') {
+                    setFriends(prev => prev.filter((f)=> {
+                        return f.friendId != change.doc.data().from
+                    }))
+                    setOnlineFriends(prev => prev.filter((f)=> {
+                        return f.friendId != change.doc.data().from
+                    }))
+                    return
+                }
                 const [friend] = await serializeFriends([change.doc]);
                 setFriends(prev => {
                     const idx = prev.findIndex(f => f.friendId === friend.friendId)
@@ -196,10 +210,6 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         setErrorMessage('')
     }
 
-    const isValidSearchId = (searchId: string) => {
-        return searchId.length === 20
-    }
-
     const handleOutgoingRequest = () => {
         (document.getElementById('outgoing_request_modal') as HTMLDialogElement)!.showModal();
         setModalOpen(true)
@@ -251,7 +261,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                             e.stopPropagation()
                             handleRemoveConfirmation(friend)
                         }}>
-                            <RemoveUserIcon iconColor={'red'}/>
+                            <RemoveUserIcon className='text-red-600'/>
                         </div>
                     </div>
                 </div>
@@ -442,95 +452,13 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     <button className='btn bg-primary rounded-lg' onClick={handleAddFriend}>Add Friend</button>
                 </div>
             </div>
-            <AutoSizer>
-                {({width, height})=>
-                    <List
-                        width={width}
-                        height={height}
-                        rowHeight={cacheRef.current.rowHeight}
-                        deferredMeasurementCache={cacheRef.current}
-                        rowCount={selectedOnline ? onlineFriends.length : friends.length}
-                        rowRenderer={renderFriends}
-                        ref={listRef}
-                    />
-                }
-            </AutoSizer>
-            <dialog id="remove_confirmation_modal" className="modal">
-                <div className="modal-box pb-12">
-                    <form method="dialog">
-                        {/* if there is a button in form, it will close the modal */}
-                        <div className='absolute bottom-2 right-4'>
-                            <button className="btn btn-sm bg-gray-500 mr-2 hover:!border-gray-500 hover:bg-gray-600" onClick={()=>setRemoveFriend(null)}>Cancel</button>
-                            <button className="btn btn-sm bg-red-500 hover:!border-red-500 hover:bg-red-600" onClick={()=>sendRemove(removeFriend!.friendId)}>Remove Friend</button>
-                        </div>
-                    </form>
-                    <h3 className="font-bold text-lg">Remove '{removeFriend?.username}'</h3>
-                    <h3 className="text-md">Are you sure you want to remove {removeFriend?.username} from your friends?</h3>
-                </div>
-            </dialog>
-
-            <dialog id="add_friend_modal" className="modal" onClose={handleCloseRequest}>
-                <div className="modal-box">
-                    <form method="dialog">
-                    {/* if there is a button in form, it will close the modal */}
-                    <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" 
-                        onClick={handleCloseRequest}>✕</button>
-                    <h3 className="font-bold text-lg">Add Friend</h3>
-                    <div>Your friend ID: {userId}</div>
-                    <input type="text" onChange={(e)=>setSearchId(e.target.value)} value={searchId} placeholder="Enter user ID: " className="input my-2"/>
-                    </form>
-                    <button onClick={handleSend} className={`btn btn-primary ${!isValidSearchId(searchId) && 'pointer-events-none opacity-50'}`}>Send Friend Request</button>
-                    {successRequestMessage && <div className='text-green-400 m-2'>Friend request sent successfully!</div>}
-                    {errorMessage && <div className='text-red-400 m-2'>{errorMessage}</div>}
-                </div>
-            </dialog>
-             <dialog id="outgoing_request_modal" className="modal" onCancel={()=>setModalOpen(false)}>
-                <div className="modal-box">
-                    <form method="dialog">
-                        {/* if there is a button in form, it will close the modal */}
-                        <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={()=>setModalOpen(false)}>✕</button>
-                        <h3 className="font-bold text-lg">Outgoing Requests</h3>
-                        {outgoingRequests.length === 0 ?  <h3>There are no outgoing requests.</h3> :
-                        <div className='h-64'>
-                            <AutoSizer>
-                                {({width, height})=>
-                                <List
-                                    width={width}
-                                    height={height}
-                                    rowHeight={cacheRef.current.rowHeight}
-                                    deferredMeasurementCache={cacheRef.current}
-                                    rowCount={outgoingRequests.length}
-                                    rowRenderer={renderRequests}
-                                    ref={listRef}
-                                />
-                                }           
-                            </AutoSizer>
-                        </div>
-                        }
-                    </form>
-                </div>
-            </dialog>
+            <VList cacheRef={cacheRef} listRef={listRef} renderer={renderFriends} rowCount={selectedOnline ? onlineFriends.length : friends.length}/>
+            <RemoveFriendConfirmationModal removeFriend={removeFriend} setRemoveFriend={setRemoveFriend} sendRemove={sendRemove} />
+            <AddFriendModal handleSend={handleSend} searchId={searchId} setSearchId={setSearchId} userId={userId} handleCloseRequest={handleCloseRequest} errorMessage={errorMessage} successRequestMessage={successRequestMessage}/>
+            <OutgoingRequestModal cacheRef={cacheRef} listRef={listRef} renderer={renderRequests} rowCount={outgoingRequests.length} setModalOpen={setModalOpen}/>
         </div>
     )
 
 }
-
-const serializeFriends = async (docSnapshots: QueryDocumentSnapshot[]) => {
-    return (await Promise.all(docSnapshots.map(async (snapshot)=>{
-        const data = snapshot.data()
-        const userDocRef = doc(db, 'users', data.from)
-        const userDocSnapshot = await getDoc(userDocRef)
-        if(!userDocSnapshot.exists()) return null
-        const userData = userDocSnapshot.data()
-        return {
-            relationshipId: snapshot.id,
-            friendId: data.from,
-            username: userData.username,
-            isOnline: userData.isOnline,
-            pfpFilePath: userData.pfpFilePath
-        }
-    }))).filter((f)=>f !== null)
-}
-
 
 export default FriendList

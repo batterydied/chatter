@@ -3,7 +3,7 @@ export type Reaction = {
     emoji: string,
 }
 
-type ReactionsProps = {
+export type ReactionsProps = {
     reactions: Reaction[],
     msgId: string,
     appUserId: string,
@@ -11,25 +11,10 @@ type ReactionsProps = {
     handleDecrement: (emoji: string, msgId: string) => void
 }
 
-type SerializedReaction = {
+export type SerializedReaction = {
     count: number,
     emoji: string,
     users: string[]
-}
-
-export type SerializedMessage = {
-  id: string
-  text: string
-  messageTime: string,
-  senderId: string,
-  timestamp: Date,
-  isEdited: boolean,
-  isReply: boolean,
-  replyId: string,
-  reactions: {
-    user: string
-    emoji: string,
-  }[],
 }
 
 export const Reactions = ({msgId, reactions, appUserId, handleIncrement, handleDecrement}: ReactionsProps) => {

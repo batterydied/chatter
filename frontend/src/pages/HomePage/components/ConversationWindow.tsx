@@ -5,14 +5,17 @@ import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from 'f
 import type { Timestamp } from 'firebase/firestore'
 import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
-import { AutoSizer, CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
+import { CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
 import { getPfpByFilePath, type Conversation } from '../homePageHelpers'
 import EmojiPicker from 'emoji-picker-react'
 import { Theme } from 'emoji-picker-react'
-import { Reactions, type Reaction, type SerializedMessage } from './conversationWindowHelper'
 import { supabase } from '../../../config/supabase'
 import Loading from './Loading'
+import DeleteMessageModal from './DeleteMessageModal'
+import { Reactions, type Reaction } from './Reactions'
+import VList from './VList'
+import serializeMessages from '../../../utils/serializeMessages'
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -24,7 +27,7 @@ type ConversationWindowProps = {
   }
 }
 
-type RawMessage = {
+export type RawMessage = {
   id: string,
   createdAt: string | Timestamp, //if you get it from backend api, it's a string; if you use firebase snapshot, it's a timestamp
   senderId: string,
@@ -39,6 +42,20 @@ type RawMessage = {
   }[]
 }
 
+export type SerializedMessage = {
+  id: string
+  text: string
+  messageTime: string,
+  senderId: string,
+  timestamp: Date,
+  isEdited: boolean,
+  isReply: boolean,
+  replyId: string,
+  reactions: {
+    user: string
+    emoji: string,
+  }[],
+}
 const ConversationWindow = ({ conversation, userId, headerData }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loadingMessages, setLoadingMessages] = useState(true)
@@ -47,7 +64,6 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
   const [loadingMore, setLoadingMore] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
   const [earliestMessageId, setEarliestMessageId] = useState<string | null>(null)
-  const [hoveredIcon, setHoveredIcon] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<SerializedMessage | null>(null)
   const [editMessage, setEditMessage] = useState<SerializedMessage | null>(null)
   const [editMessageInputMessage, setEditMessageInputMessage] = useState('')
@@ -82,26 +98,6 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
       ele.focus();
     }
   }, []);
-
-  const serializeMessages = async (rawMessages: RawMessage[]) => {
-    return await Promise.all(
-      rawMessages.map((m) => {
-        const timestamp = typeof m.createdAt === 'string' ? new Date(m.createdAt) : m.createdAt.toDate()
-        const messageTime = formatMessageTime(timestamp)
-        return {
-          id: m.id,
-          text: m.text,
-          messageTime,
-          senderId: m.senderId,
-          timestamp,
-          isEdited: m.isEdited,
-          isReply: m.isReply,
-          replyId: m.replyId,
-          reactions: m.reactions,
-        };
-      })
-    );
-  }
 
   useEffect(()=>{
     const unsub = onSnapshot(doc(db, 'conversations', conversation.id), (snapshot)=>{
@@ -506,52 +502,18 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
     
             {isHovered && (
               <div className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center">
-                <button
-                  onMouseEnter={() => setHoveredIcon('react')}
-                  onMouseLeave={() => setHoveredIcon(null)}
-                  onClick={()=>{
+                <SmileIcon onClick={
+                  ()=>{
                     setIsReactSelected(true)
                     setSelectedMessageId(msg.id)
-                  }}
-                  className={`cursor-pointer ${
-                    hoveredIcon == 'react' ? 'bg-gray-700' : 'bg-base-100'
-                  } rounded-md p-1`}
-                >
-                  <SmileIcon iconColor='white' />
-                </button>
+                  }
+                } className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
                 {userId == msg.senderId && (
-                  <button
-                    onClick={() => handleEdit(msg)}
-                    onMouseEnter={() => setHoveredIcon('edit')}
-                    onMouseLeave={() => setHoveredIcon(null)}
-                    className={`cursor-pointer ${
-                      hoveredIcon == 'edit' ? 'bg-gray-700' : 'bg-base-100'
-                    } rounded-md p-1`}
-                  >
-                    <EditIcon iconColor='white' />
-                  </button>
+                    <EditIcon onClick={() => handleEdit(msg)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
                 )}
-                <button
-                  onClick={() => handleReply(msg)}
-                  onMouseEnter={() => setHoveredIcon('reply')}
-                  onMouseLeave={() => setHoveredIcon(null)}
-                  className={`cursor-pointer ${
-                    hoveredIcon == 'reply' ? 'bg-gray-700' : 'bg-base-100'
-                  } rounded-md p-1`}
-                >
-                  <ReplyIcon iconColor='white' />
-                </button>
+                <ReplyIcon onClick={() => handleReply(msg)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
                 {userId == msg.senderId && (
-                  <button
-                    onClick={() => handleDeleteConfirmation(msg)}
-                    onMouseEnter={() => setHoveredIcon('delete')}
-                    onMouseLeave={() => setHoveredIcon(null)}
-                    className={`cursor-pointer ${
-                      hoveredIcon == 'delete' ? 'bg-gray-700' : 'bg-base-100'
-                    } rounded-md p-1`}
-                  >
-                    <DeleteIcon iconColor="#D0021B" />
-                  </button>
+                    <DeleteIcon onClick={() => handleDeleteConfirmation(msg)} className="text-red-800 hover:text-red-600 hover:cursor-pointer mx-1" />
                 )}
               </div>
             )}
@@ -748,7 +710,7 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
         {isReactSelected && 
             <div className="absolute inset-0 z-[99999] flex items-center justify-center" onClick={()=>setIsReactSelected(false)}>
                 <div onClick={(e)=>e.stopPropagation()}>
-                  <EmojiPicker onEmojiClick={(e)=>handleReact(e.emoji)}/>
+                  <EmojiPicker theme={'dark' as Theme} onEmojiClick={(e)=>handleReact(e.emoji)}/>
                 </div>
             </div>
         }
@@ -763,23 +725,7 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>
-          <AutoSizer>
-            {({width, height})=>
-              <List
-                width={width}
-                height={height}
-                rowHeight={cacheRef.current.rowHeight}
-                deferredMeasurementCache={cacheRef.current}
-                rowCount={messages.length}
-                rowRenderer={renderMessages}
-                scrollToIndex={shouldScrollToBottom ? messages.length - 1 : undefined}
-                onScroll={handleScroll}
-                ref={listRef}
-                rowKey={({ index }:{index: number}) => messages[index].id}
-                className='mt-2'
-              />
-            }
-          </AutoSizer> 
+          <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} rowCount={messages.length} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length - 1 : undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>
         </div>
       <div>
         {replyMessage && 
@@ -820,64 +766,16 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
               ref={textareaRef}
               className="focus:outline-none textarea-md w-[90%] resize-none overflow-auto !min-h-0"
             />
-            <div className='hover:bg-base-100 p-1 rounded-md' ref={pickerIconRef}>
-              <SmileIcon onClick={handlePicker} className='hover:cursor-pointer hover:accent' iconColor={shouldOpenPicker ? 'white' : 'gray'} />
+            <div className='group hover:bg-base-100 p-1 rounded-md' ref={pickerIconRef}>
+              <SmileIcon onClick={handlePicker} className={`hover:cursor-pointer group-hover:text-gray-400 ${shouldOpenPicker ? '!text-white' : 'text-gray-600'}`} />
             </div>
           </div>
         </div>
 
       </div>
-      <dialog id="delete_confirmation_modal" className="modal">
-        <div className="modal-box">
-          <form method="dialog">
-            {/* if there is a button in form, it will close the modal */}
-            <div className='absolute bottom-2 right-4'>
-              <button className="btn btn-sm bg-gray-500 mr-2 hover:!border-gray-500 hover:bg-gray-600" onClick={()=>setDeleteMessage(null)}>Cancel</button>
-              <button className="btn btn-sm bg-red-500 hover:!border-red-500 hover:bg-red-600" onClick={()=>sendDelete(deleteMessage!.id)}>Delete</button>
-            </div>
-          </form>
-          <h3 className="font-bold text-lg">Delete Message</h3>
-          <h3 className="text-md">Are you sure you want to delete this message?</h3>
-          <div className='chat chat-end bg-base-100 p-2 m-6 rounded-md'>
-              <div className="chat-header">
-                {getUsername(deleteMessage?.senderId || '')}
-                <time className="text-xs opacity-50 ml-2">{deleteMessage?.messageTime}</time>
-              </div>
-              <div className={`chat-bubble mt-3`}>
-                {deleteMessage && deleteMessage.text.length > 500 ? deleteMessage.text.slice(0, 500) + '...' : deleteMessage?.text}
-                {deleteMessage?.isEdited && <span className='absolute bottom-0 right-full px-2 text-xs text-gray-300'>(edited)</span>}
-              </div>
-          </div>
-        </div>
-      </dialog>
+      <DeleteMessageModal deleteMessage={deleteMessage} username={getUsername(deleteMessage?.senderId || '')} setDeleteMessage={setDeleteMessage} sendDelete={sendDelete}/>
     </div>
   )
 }
-
-const formatMessageTime = (date: Date): string => {
-  const now = new Date()
-  const diffInMs = now.getTime() - date.getTime()
-  const diffInDays = diffInMs / (1000 * 60 * 60 * 24)
-
-  if(diffInDays > 1){
-    // More than 1 day ago → full date + time
-    return date.toLocaleString('en-US', {
-      year: '2-digit',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })
-  }else{
-    // Within 1 day → only time
-    return date.toLocaleString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })
-  }
-}
-
 
 export default ConversationWindow

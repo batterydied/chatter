@@ -3,18 +3,19 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { fetchUserFromDB, getPfpByFilePath, subscribeConversation, subscribeDirectConversation } from './homePageHelpers'
 import type { AppUser, Conversation, FriendRequest } from './homePageHelpers'
-import NewUserModal from './components/NewUserModal'
+import NewUserModal from './components/NewUserPage'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
 import { CheckIcon, GearsIcon, RequestIcon, UserIcon, XIcon } from '../../assets/icons'
 import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore'
 import { db } from '../../config/firebase'
-import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
+import { CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
 import axios from 'axios'
 import { toast } from 'sonner'
 import Loading from './components/Loading'
 import RequestModal from './components/RequestModal'
 import VList from './components/VList'
+import SettingModal from './components/SettingModal'
 
 type HomeProps = {
     user: User | null
@@ -195,7 +196,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                     </div>
                                     <div>{conversation.name}</div>
                                 </div>
-                                <XIcon onClick={(e)=>handleHideConversation(e, conversation)} className='hidden group-hover:block rounded-full hover:outline-1 hover:outline-accent' iconColor='white'/>
+                                <XIcon onClick={(e)=>handleHideConversation(e, conversation)} className='hidden group-hover:block rounded-full hover:outline-1 hover:outline-accent text-gray-400 hover:text-white'/>
                             </li>
                         </div>
                     )
@@ -229,12 +230,12 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <div className='flex items-center'>
                                     <div onClick={()=>handleAccept(request.requestId)}className='w-[30px] h-[30px] rounded-full bg-green-600 mr-6 hover:cursor-pointer hover:bg-green-700 active:bg-green-800 flex justify-center items-center'>
                                         <div>
-                                            <CheckIcon iconColor='black'/>
+                                            <CheckIcon className='text-black'/>
                                         </div>
                                     </div>
                                     <div onClick={()=>handleDecline(request.requestId)} className='w-[30px] h-[30px] rounded-full bg-red-600 hover:cursor-pointer hover:bg-red-700 active:bg-red-800 flex justify-center items-center'>
                                         <div>
-                                            <XIcon iconColor='black' />
+                                            <XIcon className='text-black' />
                                         </div>
                                     </div>
                                 </div>
@@ -263,64 +264,57 @@ const HomePage = ({user, logOut} : HomeProps) => {
             {user && user.email ? (
                 isNewUser ? (
                     <NewUserModal setIsNewUser={setIsNewUser} email={user.email} setAppUser={setAppUser} user={user}/>
-                ) : (
-                    <div className='flex flex-row w-full h-full'>
-                        <div className='min-w-[360px]'>
-                            <ul className='list h-5/6 overflow-y-auto overflow-x-hidden'>
-                                <li>
-                                    <button className='btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300' onClick={()=>setSelectedConversation(null)}>
-                                        <UserIcon iconColor='white' />
-                                        Friends
-                                    </button>
-                                </li>
-                                <li>
-                                    <button className='btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300' onClick={handleOpenRequest}>
-                                        <RequestIcon iconColor='white'/>
-                                        Requests
-                                    </button>
-                                </li>
-                                <div className='border-b border-gray-700 pb-2' />
-                                <div className='my-1 flex justify-start text-gray-600 text-sm'>
-                                    Direct Messages
-                                </div>
-                                <VList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} rowCount={visibleConversations.length} className='overflow-x-hidden'/> 
-                            </ul>
-                            <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
-                                <div className='flex flex-row items-center'>
-                                    <div className="avatar avatar-online avatar-placeholder">
-                                        <div className="bg-neutral text-base-content w-16 rounded-full">
-                                            <img src={getPfpByFilePath(appUser!.pfpFilePath)} />
+                ) : (appUser &&
+                        <div className='flex flex-row w-full h-full'>
+                            <div className='min-w-[360px]'>
+                                <ul className='list h-5/6 overflow-y-auto overflow-x-hidden'>
+                                    <li>
+                                        <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 text-gray-400 hover:text-white' onClick={()=>setSelectedConversation(null)}>
+                                            <UserIcon className='text-gray-400 group-hover:text-white' />
+                                            Friends
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 text-gray-400 hover:text-white' onClick={handleOpenRequest}>
+                                            <RequestIcon className='text-gray-400 group-hover:text-white'/>
+                                            Requests
+                                        </button>
+                                    </li>
+                                    <div className='border-b border-gray-700 pb-2' />
+                                    <div className='my-1 flex justify-start text-gray-600 text-sm'>
+                                        Direct Messages
+                                    </div>
+                                    <VList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} rowCount={visibleConversations.length} className='overflow-x-hidden'/> 
+                                </ul>
+                                <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
+                                    <div className='flex flex-row items-center'>
+                                        <div className="avatar avatar-online avatar-placeholder">
+                                            <div className="bg-neutral text-base-content w-16 rounded-full">
+                                                <img src={getPfpByFilePath(appUser!.pfpFilePath)} />
+                                            </div>
+                                        </div>
+                                        <div className='pl-2'>
+                                            <p className='text-sm text-left'>{appUser?.username}</p>
+                                            <p className='text-sm text-neutral-content'>ID: {appUser?.id}</p>
                                         </div>
                                     </div>
-                                    <div className='pl-2'>
-                                        <p className='text-sm text-left'>{appUser?.username}</p>
-                                        <p className='text-sm text-neutral-content'>ID: {appUser?.id}</p>
-                                    </div>
+                                    <GearsIcon onClick={handleOpenSetting} className='text-gray-400 hover:text-white hover:cursor-pointer hover:animate-spin-slow' size={32}/>
                                 </div>
-                                <GearsIcon onClick={handleOpenSetting} className='hover:cursor-pointer hover:animate-spin-slow' iconColor='gray' size={32}/>
                             </div>
-                        </div>
-                        <div className='ml-2 p-2 w-full bg-base-300'>
-                            {selectedConversation ? 
-                            <ConversationWindow conversation={selectedConversation} userId={appUser!.id} headerData={
-                                recentConversations.find((c)=>c.id== selectedConversation.id) || selectedConversation
-                            }/>
-                            : 
-                            <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
-                            }
-                        </div>
-                        <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} setModalOpen={setModalOpen} handleDeclineAll={handleDeclineAll}/>
+                            <div className='ml-2 p-2 w-full bg-base-300'>
+                                {selectedConversation ? 
+                                <ConversationWindow conversation={selectedConversation} userId={appUser!.id} headerData={
+                                    recentConversations.find((c)=>c.id== selectedConversation.id) || selectedConversation
+                                }/>
+                                : 
+                                <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
+                                }
+                            </div>
+                            <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} rowCount={friendRequests.length} setModalOpen={setModalOpen} handleDeclineAll={handleDeclineAll}/>
 
-                        <dialog id="setting_modal" className="modal">
-                            <div className="modal-box">
-                                <form method="dialog">
-                                    {/* if there is a button in form, it will close the modal */}
-                                    <div>hey</div>
-                                </form>
-                            </div>
-                        </dialog>
-                    </div>
-                )
+                            <SettingModal user={appUser} logOut={logOut}/>
+                        </div>
+                    )
                 ) : (
                 <Navigate to='/' />
                 )}
