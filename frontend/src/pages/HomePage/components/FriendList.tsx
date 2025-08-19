@@ -63,7 +63,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         const unsub = onSnapshot(queryRef, (snapshot) => {
             snapshot.docChanges().forEach(async (change) => {
                 const [friend] = await serializeFriends([change.doc]);
-                setFriends((prev) => {
+                setFriends(prev => {
                     const idx = prev.findIndex(f => f.friendId === friend.friendId)
                     let newArr
                     if (idx === -1) {
@@ -215,7 +215,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             })
             const idx = friends.findIndex((f)=>f.friendId == friendId)
             if(idx >= 0) cacheRef.current.clear(idx, 0)
-            setFriends((prev) => prev.filter((f) => f.friendId != friendId))
+            setFriends(prev => prev.filter((f) => f.friendId != friendId))
             setRemoveFriend(null)
 
         }catch{
@@ -240,7 +240,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             >
                 {()=>
                 <div style={style} className='relative'>
-                    <div onClick={async ()=> await openConversation(friend.friendId, userId)} className='rounded-none list-row cursor-pointer hover:bg-neutral hover:rounded-xl flex justify-start items-center overflow-hidden'>
+                    <div onClick={async ()=> await openConversation(friend.friendId, userId, friend.isOnline)} className='rounded-none list-row cursor-pointer hover:bg-neutral hover:rounded-xl flex justify-start items-center overflow-hidden'>
                         <div className={`avatar ${friend.isOnline ? 'avatar-online' : 'avatar-offline'}`}>
                             <div className="w-10 rounded-full">
                                 <img src={getPfpByFilePath(friend.pfpFilePath)} />
@@ -386,7 +386,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         friendDict.current = {}
     }, [userId])
 
-    const openConversation = async (userId1: string, userId2: string) => {
+    const openConversation = async (userId1: string, userId2: string, isOnline: boolean) => {
         const queryRef = query(collection(db, 'conversations'), where('directConversationId', '==', [userId1, userId2].sort().join('_')))
         try{
             const docSnapshot = await getDocs(queryRef)
@@ -404,7 +404,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     hiddenBy: data.hiddenBy,
                     participants: data.participants,
                     pfpFilePath: data.pfpFilePath,
-                    directConversationId: data.directConversationId
+                    directConversationId: data.directConversationId,
+                    isOnline
                 }
                 setSelectedConversation(conversation)
             }else{
@@ -416,7 +417,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     hiddenBy: data.hiddenBy,
                     participants: data.participants,
                     pfpFilePath: data.pfpFilePath,
-                    directConversationId: data.directConversationId
+                    directConversationId: data.directConversationId,
+                    isOnline
                 })
                 await updateDoc(selectedDoc.ref, {hiddenBy: selectedDoc.data().hiddenBy.filter((id: string) => id !== userId)})
             }

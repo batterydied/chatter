@@ -7,7 +7,6 @@ import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon } from '../../../assets/icon
 import { toast } from 'sonner'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
-//import forceRemeasure from '../../../utils/forceRemeasure'
 import { getPfpByFilePath, type Conversation } from '../homePageHelpers'
 import EmojiPicker from 'emoji-picker-react'
 import { Theme } from 'emoji-picker-react'
@@ -18,6 +17,11 @@ import Loading from './Loading'
 type ConversationWindowProps = {
   conversation: Conversation,
   userId: string,
+  headerData: {
+    name: string,
+    pfpFilePath: string,
+    isOnline: boolean
+  }
 }
 
 type RawMessage = {
@@ -35,13 +39,7 @@ type RawMessage = {
   }[]
 }
 
-type Recipient = {
-  id: string,
-  pfpFilePath: string,
-  username: string
-}
-
-const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) => {
+const ConversationWindow = ({ conversation, userId, headerData }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loadingMessages, setLoadingMessages] = useState(true)
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
@@ -62,7 +60,6 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const [selectedMessageId, setSelectedMessageId] = useState('')
   const [conversationName, setConversationName] = useState('')
   const [conversationPfpFilePath, setConversationPfpFilePath] = useState('')
-  const [recipient, setRecipient] = useState<Recipient | null>(null)
 
   const [usernameRecord, setUsernameRecord] = useState<Record<string, string>>({})
   const [pfpRecord, setPfpRecord] = useState<Record<string, string>>({})
@@ -110,12 +107,12 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     const unsub = onSnapshot(doc(db, 'conversations', conversation.id), (snapshot)=>{
       if(!snapshot.exists()) return
       const data = snapshot.data()
-      setConversationPfpFilePath((prev)=> data.pfpFilePath == prev ? prev : data.pfpFilePath)
-      setConversationName((prev)=> data.name == prev ? prev : data.name)
+      setConversationPfpFilePath(prev => data.pfpFilePath == prev ? prev : data.pfpFilePath)
+      setConversationName(prev => data.name == prev ? prev : data.name)
     })
 
     return unsub
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [conversation])
 
   const fetchMessages = useCallback(async (size: number, prevMessageId: string | null) => {
@@ -146,9 +143,6 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       const unsubscribe = onSnapshot(userRef, snapshot => {
         if (snapshot.exists()) {
           const data = snapshot.data()
-          if(conversation.directConversationId && participantId != userId){
-            setRecipient({id: snapshot.id, pfpFilePath: data.pfpFilePath, username: data.username})
-          }
           setPfpRecord(prev => ({
             ...prev,
             [participantId]: data.pfpFilePath
@@ -173,7 +167,6 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     return () => {
       unsubscribers.forEach(unsub => unsub())
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation, userId])
 
   useEffect(()=>{
@@ -212,7 +205,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     try{
       await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversation.id}/message/${msgId}`)
       let clearAllBelow = false
-      setMessages((prev) => prev.filter((m, idx) => {
+      setMessages(prev => prev.filter((m, idx) => {
         if(m.id == msgId) clearAllBelow = true; 
         
         if(clearAllBelow) cacheRef.current.clear(idx, 0)
@@ -251,7 +244,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
             type: 'text',
             text: updatedMsg
           })
-        setMessages((prevMessages) =>
+        setMessages(prevMessages =>
           prevMessages.map((m) =>
             m.id === msg.id ? { ...m, text: updatedMsg, isEdited: true } : m
           )
@@ -607,7 +600,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       const unsub = onSnapshot(msgRef, async (snapshot) => {
         if (!snapshot.exists()){ 
           let idx = -1
-          setMessages((prev)=>prev.filter((m, currIdx)=>{
+          setMessages(prev =>prev.filter((m, currIdx)=>{
             if(m.id == msg.id) idx = currIdx
             return m.id !== msg.id
           }))
@@ -629,7 +622,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         }]);
 
         subscriptionDict.current[msg.id] = unsub
-        setMessages((prev) => {
+        setMessages(prev => {
           const newMessages = prev.map((m) => {
             if (m.id !== serialized.id) return m;
 
@@ -694,7 +687,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       const serializedMessages = await serializeMessages(rawMessages);
       
       let idx = -1
-      setMessages((prev) => {
+      setMessages(prev => {
         const newMessage = serializedMessages[0];
         if (!newMessage) return prev;
         
@@ -717,7 +710,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   }, [conversation, userId, isNearBottom]);
 
   const handlePicker = () => {
-    setShouldOpenPicker((prev)=> !prev)
+    setShouldOpenPicker(prev => !prev)
   }
 
   const uploadMessage = async (conversationId: string, userId: string, inputMessage: string, isReply: boolean, replyId: string) => {
@@ -760,12 +753,13 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
             </div>
         }
         <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
-          <div className="avatar">
+          <div className={`avatar 
+            ${conversation.directConversationId && (headerData.isOnline ? 'avatar-online' : 'avatar-offline')}`}>
             <div className="w-6 rounded-full">
-              <img src={recipient ? getPfpById(recipient.id) : getPfpByFilePath(conversationPfpFilePath)} />
+              <img src={conversation.directConversationId ? getPfpById(headerData.pfpFilePath) : getPfpByFilePath(conversationPfpFilePath)} />
             </div>
           </div>
-          <div className='ml-2 text-white'>{recipient ? recipient.username : conversationName}</div>
+          <div className='ml-2 text-white'>{conversation.directConversationId ? headerData.name : conversationName}</div>
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>
@@ -798,7 +792,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
           <div className="absolute right-0 bottom-full" ref={pickerRef}>
             <EmojiPicker 
             onEmojiClick={(emojiObj)=>{
-              setInputMessage((prev)=>prev + emojiObj.emoji)
+              setInputMessage(prev => prev + emojiObj.emoji)
               textareaElRef.current?.focus();
             }} 
             theme={'dark' as Theme}

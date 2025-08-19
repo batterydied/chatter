@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
-import { fetchUserFromDB, subscribeConversation } from './homePageHelpers'
+import { fetchUserFromDB, getPfpByFilePath, subscribeConversation, subscribeDirectConversation } from './homePageHelpers'
 import type { AppUser, Conversation } from './homePageHelpers'
 import NewUserModal from './components/NewUserModal'
 import FriendList from './components/FriendList'
@@ -12,7 +12,6 @@ import { db } from '../../config/firebase'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
 import axios from 'axios'
 import { toast } from 'sonner'
-import { supabase } from '../../config/supabase'
 import Loading from './components/Loading'
 
 type HomeProps = {
@@ -37,6 +36,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [modalOpen, setModalOpen] = useState(false)
     const requestCellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const requestListRef = useRef<List>(null)
+    const conversationRecordRef = useRef<Record<string, ()=>void>>({})
 
     const conversationCellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const conversationListRef = useRef<List>(null)
@@ -110,6 +110,12 @@ const HomePage = ({user, logOut} : HomeProps) => {
     }, [appUser])
 
     useEffect(() => {
+        for(const unsub of Object.values(conversationRecordRef.current)) unsub()
+
+        conversationRecordRef.current = {}
+    }, [appUser])
+
+    useEffect(() => {
         if (!modalOpen || !appUser) return;
 
         const queryRef = query(
@@ -130,6 +136,13 @@ const HomePage = ({user, logOut} : HomeProps) => {
             return unsub
         }
     }, [appUser])
+
+    useEffect(()=>{
+        if(appUser){
+            const unsub = subscribeDirectConversation(recentConversations, setRecentConversations, conversationRecordRef.current, appUser.id)
+            return unsub
+        }
+    }, [appUser, recentConversations])
 
     const handleDeclineAll = async () => {
         if(!appUser) return
@@ -177,9 +190,11 @@ const HomePage = ({user, logOut} : HomeProps) => {
                             }} 
                             >
                                 <div className='flex items-center'>
-                                    <div className='avatar mr-2'>
+                                    <div className={`avatar 
+                                        ${conversation.directConversationId && (conversation.isOnline ? 'avatar-online' : 'avatar-offline')} 
+                                    mr-2`}>
                                         <div className="w-10 rounded-full">
-                                            <img src="https://img.daisyui.com/images/profile/demo/yellingcat@192.webp" />
+                                            <img src={getPfpByFilePath(conversation.pfpFilePath)} />
                                         </div>
                                     </div>
                                     <div>{conversation.name}</div>
@@ -243,13 +258,6 @@ const HomePage = ({user, logOut} : HomeProps) => {
         setModalOpen(true)
     }
 
-    const getPfp = (filePath: string) => {
-        if(!filePath){
-            return supabase.storage.from('avatars').getPublicUrl('default/default_user.png').data.publicUrl
-        }
-        return supabase.storage.from('avatars').getPublicUrl(filePath).data.publicUrl
-    }
-
     return (
         <div className='w-full h-full flex justify-center items-center'>
             {user && user.email ? (
@@ -294,7 +302,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <div className='flex flex-row items-center'>
                                     <div className="avatar avatar-online avatar-placeholder">
                                         <div className="bg-neutral text-base-content w-16 rounded-full">
-                                            <img src={getPfp(appUser!.pfpFilePath)} />
+                                            <img src={getPfpByFilePath(appUser!.pfpFilePath)} />
                                         </div>
                                     </div>
                                     <div className='pl-2'>
@@ -307,7 +315,9 @@ const HomePage = ({user, logOut} : HomeProps) => {
                         </div>
                         <div className='ml-2 p-2 w-full bg-base-300'>
                             {selectedConversation ? 
-                            <ConversationWindow conversation={selectedConversation} userId={appUser!.id}/>
+                            <ConversationWindow conversation={selectedConversation} userId={appUser!.id} headerData={
+                                recentConversations.find((c)=>c.id== selectedConversation.id) || selectedConversation
+                            }/>
                             : 
                             <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
                             }

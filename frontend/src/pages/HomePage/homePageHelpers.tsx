@@ -2,6 +2,7 @@ import axios from 'axios'
 import { db } from '../../config/firebase'
 import { collection, where, query, onSnapshot, doc, getDoc, orderBy } from 'firebase/firestore'
 import { supabase } from '../../config/supabase'
+import type { Dispatch, SetStateAction } from 'react'
 
 export type AppUser = {
     id: string,
@@ -17,7 +18,8 @@ export type Conversation = {
     hiddenBy: string[],
     participants: string[],
     pfpFilePath: string,
-    directConversationId: string
+    directConversationId: string,
+    isOnline: boolean
 }
 
 export const fetchUserFromDB = async (
@@ -62,8 +64,8 @@ export const createUser = async (uid: string, email: string, username: string, s
 
 export const subscribeConversation = (
     userId: string, 
-    setter: (conversations: Conversation[])=>void,
-    setLoading: (isLoading: boolean)=>void
+    setter: React.Dispatch<React.SetStateAction<Conversation[]>>,
+    setLoading: (isLoading: boolean)=>void,
 ) => {
     const queryRef = query(
       collection(db, 'conversations'),
@@ -79,14 +81,57 @@ export const subscribeConversation = (
                 hiddenBy: data.hiddenBy,
                 participants: data.participants,
                 pfpFilePath: data.pfpFilePath,
-                directConversationId: data.directConversationId
+                directConversationId: data.directConversationId,
+                isOnline: false
             }
         }))
-        setter(conversations)
+        setter(prev => 
+            conversations.map(newConv => {
+                const existing = prev.find(c => c.id === newConv.id);
+                return {
+                ...newConv,
+                isOnline: existing?.isOnline ?? false,
+                };
+            })
+        )
         setLoading(false)
     })
 
     return unsub
+}
+
+export const subscribeDirectConversation = (
+    conversations: Conversation[], 
+    setConversations: Dispatch<SetStateAction<Conversation[]>>,
+    conversationRecord: Record<string, ()=>void>,
+    appUserId: string,
+) => {
+    for(const conversation of conversations){
+        if(conversation.id in conversationRecord || !conversation.directConversationId) continue
+        const userRef = doc(db, 'users', conversation.participants.filter((p) => p != appUserId)[0])
+        const unsub = onSnapshot(userRef, (snapshot)=>{
+            setConversations(prev =>
+                prev.map(c => {
+                    if (c.id !== conversation.id) return c;
+                    
+                    const updatedConversation = {
+                        name: 'Deleted User',
+                        pfpFilePath: '',
+                        isOnline: false
+                    }
+                    if(snapshot.exists()) {
+                        const data = snapshot.data()
+                        updatedConversation.name = data.username
+                        updatedConversation.pfpFilePath = data.pfpFilePath
+                        updatedConversation.isOnline = data.isOnline
+                    }
+
+                    return { ...c, ...updatedConversation };
+                })
+            );
+        })
+        conversationRecord[conversation.id] = unsub
+    }
 }
 
 export const serializeName = async (name: string, participants: string[], userId: string) => {
