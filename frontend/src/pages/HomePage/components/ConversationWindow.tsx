@@ -7,12 +7,13 @@ import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon } from '../../../assets/icon
 import { toast } from 'sonner'
 import { AutoSizer, CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
-import forceRemeasure from '../../../utils/forceRemeasure'
+//import forceRemeasure from '../../../utils/forceRemeasure'
 import { getPfpByFilePath, type Conversation } from '../homePageHelpers'
 import EmojiPicker from 'emoji-picker-react'
 import { Theme } from 'emoji-picker-react'
 import { Reactions, type Reaction, type SerializedMessage } from './conversationWindowHelper'
 import { supabase } from '../../../config/supabase'
+import Loading from './Loading'
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -42,7 +43,7 @@ type Recipient = {
 
 const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadingMessages, setLoadingMessages] = useState(true)
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -63,12 +64,12 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const [conversationPfpFilePath, setConversationPfpFilePath] = useState('')
   const [recipient, setRecipient] = useState<Recipient | null>(null)
 
-  const [usernameRecord, setUsernameRecord] = useState<Record<string, string>>({'': 'Deleted User'})
-  const [pfpRecord, setPfpRecord] = useState<Record<string, string>>({'': 'default/default_user.png'})
+  const [usernameRecord, setUsernameRecord] = useState<Record<string, string>>({})
+  const [pfpRecord, setPfpRecord] = useState<Record<string, string>>({})
 
   const subscriptionDict = useRef<Record<string, ()=>void>>({})
 
-  const cellMeasurerCache = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
+  const cacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
 
   const textareaElRef = useRef<HTMLTextAreaElement | null>(null)
   const listRef = useRef<List>(null)
@@ -156,14 +157,23 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
             ...prev,
             [participantId]: data.username 
           }))
+        }else{
+          setPfpRecord(prev => ({
+            ...prev,
+            [participantId]: 'default/default_user.png'
+          }))
+          setUsernameRecord(prev => ({
+            ...prev,
+            [participantId]: 'Deleted User'
+          }))
         }
       })
       unsubscribers.push(unsubscribe)
     })
-
     return () => {
       unsubscribers.forEach(unsub => unsub())
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation, userId])
 
   useEffect(()=>{
@@ -188,6 +198,9 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       uploadMessage(conversation.id, userId, inputMessage, replyMessage != null, replyMessage?.id || '')
       setInputMessage('')
     }
+    if (textareaElRef.current) {
+      textareaElRef.current.style.height = 'auto';
+    }
   }
 
   const handleDeleteConfirmation = (msg: SerializedMessage) => {
@@ -198,9 +211,15 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const sendDelete = async (msgId: string) => {
     try{
       await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversation.id}/message/${msgId}`)
-      setMessages((prev) => prev.filter((m) => m.id !== msgId))
+      let clearAllBelow = false
+      setMessages((prev) => prev.filter((m, idx) => {
+        if(m.id == msgId) clearAllBelow = true; 
+        
+        if(clearAllBelow) cacheRef.current.clear(idx, 0)
+        return m.id !== msgId
+      }))
       setDeleteMessage(null)
-      forceRemeasure(cellMeasurerCache, listRef)
+      listRef.current?.recomputeRowHeights(); 
     }catch{
       toast.error('Could not delete message, try again later.')
     }
@@ -209,11 +228,14 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const handleEdit = (msg: SerializedMessage) => {
     setEditMessage(msg)
     setEditMessageInputMessage(msg.text)
+    const idx = messages.findIndex((m)=> m.id == msg.id)
+    if(idx >= 0) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
   }
   
   const cancelEdit = () => {
+    const idx = messages.findIndex((m)=> m.id == editMessage?.id)
     setEditMessage(null)
-    forceRemeasure(cellMeasurerCache, listRef)
+    if(idx >= 0) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
   }
 
   const handleReply = (msg: SerializedMessage) => {
@@ -245,9 +267,12 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       await sendUpdate(msg.id, updatedMsg)
     }
 
+    const idx = messages.findIndex((m) => m.id == msg.id)
     setEditMessage(null)
+    
+    if(idx >= 0) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
 
-    forceRemeasure(cellMeasurerCache, listRef)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id])
 
   useEffect(() => {
@@ -268,15 +293,20 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editMessage, editMessageInputMessage, handleUpdate]);
 
   useEffect(() => {
-    const onResize = ()=> {
-      cellMeasurerCache.current.clearAll()
-      listRef.current?.recomputeRowHeights()
-      listRef.current?.forceUpdateGrid()
+    let last = 0
+    const onResize = () => {
+      const now = Date.now()
+      if (now - last > 150) {
+        cacheRef.current.clearAll()
+        listRef.current?.recomputeRowHeights()
+        listRef.current?.forceUpdateGrid()
+        last = now
+      }
     }
-
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
@@ -293,7 +323,10 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     setMessages(updatedMessages)
     const msgRef = doc(db, 'conversations', conversation.id, 'messages', msgId)
     updateDoc(msgRef, {reactions: updatedReactions})
-    forceRemeasure(cellMeasurerCache, listRef)
+
+    const idx = messages.findIndex((m) => m.id == msgId)
+    console.log(listRef.current)
+    if(idx >=0 ) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
   }
 
   const handleDecrement = (emoji: string, msgId: string) => {
@@ -308,7 +341,9 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     setMessages(updatedMessages)
     const msgRef = doc(db, 'conversations', conversation.id, 'messages', msgId)
     updateDoc(msgRef, {reactions: updatedReactions})
-    forceRemeasure(cellMeasurerCache, listRef)
+
+    const idx = messages.findIndex((m) => m.id == msgId)
+    if(idx >=0 ) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
   }
 
   const handleReact = (emoji: string) => {
@@ -333,12 +368,12 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         const newMessages = [...moreMessages, ...messages];
 
         const addedHeight = moreMessages.reduce((sum, _, i) => {
-          return sum + cellMeasurerCache.current.rowHeight({ index: i })
+          return sum + cacheRef.current.rowHeight({ index: i })
         }, 0);
 
         setMessages(newMessages);
         setEarliestMessageId(newEarliestId);
-        cellMeasurerCache.current.clearAll();
+        cacheRef.current.clearAll();
 
         requestAnimationFrame(() => {
           list.recomputeRowHeights();
@@ -358,7 +393,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   }
 
   const getUsername = (id: string) => {
-    return usernameRecord[id] || 'Deleted User'
+    return usernameRecord[id]
   }
 
   const renderMessages: ListRowRenderer = ({ index, key, parent, style }) => {
@@ -381,7 +416,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   return (
     <CellMeasurer
       key={key}
-      cache={cellMeasurerCache.current}
+      cache={cacheRef.current}
       parent={parent}
       columnIndex={0}
       rowIndex={index}
@@ -493,10 +528,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
                 </button>
                 {userId == msg.senderId && (
                   <button
-                    onClick={() => {
-                      handleEdit(msg)
-                      forceRemeasure(cellMeasurerCache, listRef)
-                    }}
+                    onClick={() => handleEdit(msg)}
                     onMouseEnter={() => setHoveredIcon('edit')}
                     onMouseLeave={() => setHoveredIcon(null)}
                     className={`cursor-pointer ${
@@ -538,7 +570,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
 
   useEffect(() => {
     const init = async () => {
-      setLoading(true)
+      setLoadingMessages(true)
       setMessages([])
       const initialMessages = await fetchMessages(15, null)
       if(initialMessages.length != 0){
@@ -547,7 +579,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       }
       requestAnimationFrame(() => {
         setShouldScrollToBottom(true)
-        setLoading(false)
+        setLoadingMessages(false)
       })
     }
     init()
@@ -574,8 +606,12 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
 
       const unsub = onSnapshot(msgRef, async (snapshot) => {
         if (!snapshot.exists()){ 
-          setMessages((prev)=>prev.filter((m)=>m.id !== msg.id))
-          forceRemeasure(cellMeasurerCache, listRef)
+          let idx = -1
+          setMessages((prev)=>prev.filter((m, currIdx)=>{
+            if(m.id == msg.id) idx = currIdx
+            return m.id !== msg.id
+          }))
+          cacheRef.current.clear(idx, 0)
           return;
         }
 
@@ -593,7 +629,6 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         }]);
 
         subscriptionDict.current[msg.id] = unsub
-        let updated = false
         setMessages((prev) => {
           const newMessages = prev.map((m) => {
             if (m.id !== serialized.id) return m;
@@ -607,15 +642,12 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
               m.reactions !== serialized.reactions
               // add more fields to compare if relevant
             ) {
-              updated = true;
               return serialized;
             }
             return m;
           });
           return newMessages
         });
-
-        if(updated) forceRemeasure(cellMeasurerCache, listRef)
       });
     });
 
@@ -661,6 +693,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
 
       const serializedMessages = await serializeMessages(rawMessages);
       
+      let idx = -1
       setMessages((prev) => {
         const newMessage = serializedMessages[0];
         if (!newMessage) return prev;
@@ -671,9 +704,13 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         if (newMessage.senderId === userId || isNearBottom) {
           setShouldScrollToBottom(true);
         }
+        idx = prev.length;
+        cacheRef.current.clear(idx, 0)
 
         return [...prev, newMessage];
       });
+
+      if(idx >= 0) listRef.current?.recomputeRowHeights(idx)
     });
     
     return unsub;
@@ -704,14 +741,9 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     }
   }
 
-  if(!messages){
-    return (
-        <div className="w-full h-full flex justify-center items-center">
-            <span className="loading loading-ring loading-xl"></span>
-        </div>
-    );
-  }
-  if(loading){
+  if(!messages) return <Loading />
+    
+  if(loadingMessages){
     return (
       <div className="w-full h-full flex justify-center items-center">
         <span className="loading loading-ring loading-xl"></span>
@@ -742,8 +774,8 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
               <List
                 width={width}
                 height={height}
-                rowHeight={cellMeasurerCache.current.rowHeight}
-                deferredMeasurementCache={cellMeasurerCache.current}
+                rowHeight={cacheRef.current.rowHeight}
+                deferredMeasurementCache={cacheRef.current}
                 rowCount={messages.length}
                 rowRenderer={renderMessages}
                 scrollToIndex={shouldScrollToBottom ? messages.length - 1 : undefined}
@@ -774,7 +806,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
             open={shouldOpenPicker}
             />
           </div>
-          <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-center p-2'>
+          <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-center p-2 mt-3'>
             <textarea
               id="chat-message"
               rows={1}
@@ -818,7 +850,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
                 <time className="text-xs opacity-50 ml-2">{deleteMessage?.messageTime}</time>
               </div>
               <div className={`chat-bubble mt-3`}>
-                {deleteMessage?.text}
+                {deleteMessage && deleteMessage.text.length > 500 ? deleteMessage.text.slice(0, 500) + '...' : deleteMessage?.text}
                 {deleteMessage?.isEdited && <span className='absolute bottom-0 right-full px-2 text-xs text-gray-300'>(edited)</span>}
               </div>
           </div>

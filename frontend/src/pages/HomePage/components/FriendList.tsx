@@ -6,6 +6,7 @@ import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer 
 import { RemoveUserIcon } from "../../../assets/icons"
 import { toast } from "sonner"
 import { getPfpByFilePath, serializeName, type Conversation } from "../homePageHelpers"
+import Loading from "./Loading"
 
 type FriendListProps = {
     userId: string,
@@ -38,6 +39,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [outgoingRequests, setOutgoingRequests] = useState<OutgoingRequest[]>([])
     const [modalOpen, setModalOpen] = useState(false)
     const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
+    const [isReady, setIsReady] = useState(false)
 
     const cacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const listRef = useRef<List>(null)
@@ -62,22 +64,28 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             snapshot.docChanges().forEach(async (change) => {
                 const [friend] = await serializeFriends([change.doc]);
                 setFriends((prev) => {
-                    const idx = prev.findIndex(f => f.friendId === friend.friendId);
-                    if (idx === -1) return [...prev, friend];
-                    const newArr = [...prev];
-                    newArr[idx] = friend;
-                    return newArr;
-                });
+                    const idx = prev.findIndex(f => f.friendId === friend.friendId)
+                    let newArr
+                    if (idx === -1) {
+                        newArr = [...prev, friend]
+                    } else {
+                        newArr = [...prev]
+                        newArr[idx] = friend
+                    }
 
-                const rowIndex = friends.findIndex(f => f.friendId === friend.friendId);
-                if (rowIndex >= 0) {
-                    listRef.current?.recomputeRowHeights(rowIndex);
-                }
+                    if (idx >= 0 && idx < newArr.length) {
+                        cacheRef.current.clear(idx, 0)
+                        listRef.current?.recomputeRowHeights(idx)
+                    }
+
+                    return newArr
+                })
             });
         });
 
+        setIsReady(true)
         return unsub
-    }, [friends, userId])
+    }, [userId])
 
     const handleRemoveConfirmation = (friend: Friend) => {
         setRemoveFriend(friend);
@@ -306,9 +314,10 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [modalOpen])
 
-    useEffect(()=>{
+    useEffect(() => {
         const currentFriendsSet = new Set(friends.map(f => f.friendId));
 
+        // unsubscribe removed friends
         Object.keys(friendDict.current).forEach((id) => {
             if (!currentFriendsSet.has(id)) {
                 friendDict.current[id](); // unsubscribe
@@ -316,43 +325,59 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             }
         });
 
-        friends.forEach((friend)=>{
-            if(friend.friendId in friendDict){
-                return
-            }
+        friends.forEach((friend) => {
+            if (friend.friendId in friendDict.current) return;
 
-            const friendRef = doc(db, 'users',  friend.friendId);
-            const unsub = onSnapshot(friendRef, async (snapshot)=>{
-                const idx = friends.findIndex((f)=>f.friendId == friend.friendId)
-                if (!snapshot.exists()){
-                    if(idx >= 0) cacheRef.current.clear(idx, 0)
-                    setFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
-                    setOnlineFriends((prev)=>prev.filter((f)=>f.friendId !== friend.friendId))
-                    return
+            const friendRef = doc(db, 'users', friend.friendId);
+            const unsub = onSnapshot(friendRef, async (snapshot) => {
+                const idx = friends.findIndex(f => f.friendId === friend.friendId);
+
+                if (!snapshot.exists()) {
+                    if (idx >= 0) cacheRef.current.clear(idx, 0);
+                    setFriends(prev => prev.filter(f => f.friendId !== friend.friendId));
+                    setOnlineFriends(prev => prev.filter(f => f.friendId !== friend.friendId));
+                    return;
                 }
-                
-                const data = snapshot.data()
 
+                const data = snapshot.data();
                 const updatedFriend = {
                     relationshipId: friend.relationshipId,
                     friendId: friend.friendId,
                     username: data.username,
                     isOnline: data.isOnline,
                     pfpFilePath: data.pfpFilePath
+                };
+
+                // update friends
+                setFriends(prev =>
+                    prev.map(f => (f.friendId === friend.friendId ? updatedFriend : f))
+                );
+
+                // update onlineFriends
+                setOnlineFriends(prev => {
+                    const alreadyOnline = prev.find(f => f.friendId === friend.friendId);
+                    if (updatedFriend.isOnline) {
+                        if (alreadyOnline) {
+                            return prev.map(f => (f.friendId === friend.friendId ? updatedFriend : f));
+                        } else {
+                            return [...prev, updatedFriend];
+                        }
+                    } else {
+                        return prev.filter(f => f.friendId !== friend.friendId);
+                    }
+                });
+
+                if (idx >= 0 && idx < friends.length) {
+                    cacheRef.current.clear(idx, 0);
+                    listRef.current?.recomputeRowHeights(idx);
                 }
-                
+            });
 
-                setFriends((prev)=>
-                prev.map((f)=>(f.friendId === friend.friendId ? updatedFriend : f)))
+            friendDict.current[friend.friendId] = unsub;
+        });
+    }, [friends]);
 
-                setOnlineFriends(friends.filter((f)=>f.isOnline))
 
-                if(idx >=0) listRef.current?.recomputeRowHeights(idx)
-    
-            })
-            friendDict.current[friend.friendId] = unsub
-        })
-    }, [friends])
 
     useEffect(()=>{
         for (const key in friendDict.current) {
@@ -404,6 +429,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             }
         }
     }
+    if(!isReady) return <Loading />
     return (
         <div className='list justify-start h-full overflow-hidden'>
             <div className='mb-2 border-b border-gray-700 pb-2'>

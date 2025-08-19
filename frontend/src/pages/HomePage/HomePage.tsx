@@ -13,6 +13,7 @@ import { AutoSizer, CellMeasurer, CellMeasurerCache, List, type ListRowRenderer 
 import axios from 'axios'
 import { toast } from 'sonner'
 import { supabase } from '../../config/supabase'
+import Loading from './components/Loading'
 
 type HomeProps = {
     user: User | null
@@ -235,13 +236,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
 
     }
 
-    if(loading){
-        return (
-            <div className="w-full h-full flex justify-center items-center">
-                <span className="loading loading-ring loading-xl"></span>
-            </div>
-        );
-    }
+    if(loading) return <Loading />
 
     const handleOpenRequest = () => {
         (document.getElementById('request_modal') as HTMLDialogElement)!.showModal();
