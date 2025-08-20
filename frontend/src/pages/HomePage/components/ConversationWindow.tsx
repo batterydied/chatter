@@ -3,7 +3,7 @@ import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore'
 import type { Timestamp } from 'firebase/firestore'
-import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon } from '../../../assets/icons'
+import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
 import { CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
@@ -20,11 +20,6 @@ import serializeMessages from '../../../utils/serializeMessages'
 type ConversationWindowProps = {
   conversation: Conversation,
   userId: string,
-  headerData: {
-    name: string,
-    pfpFilePath: string,
-    isOnline: boolean
-  }
 }
 
 export type RawMessage = {
@@ -56,7 +51,7 @@ export type SerializedMessage = {
     emoji: string,
   }[],
 }
-const ConversationWindow = ({ conversation, userId, headerData }: ConversationWindowProps) => {
+const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) => {
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loadingMessages, setLoadingMessages] = useState(true)
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
@@ -96,8 +91,6 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
     const unsub = onSnapshot(doc(db, 'conversations', conversation.id), (snapshot)=>{
       if(!snapshot.exists()) return
       const data = snapshot.data()
-      setConversationPfpFilePath(prev => data.pfpFilePath == prev ? prev : data.pfpFilePath)
-      setConversationName(prev => data.name == prev ? prev : data.name)
     })
     cacheRef.current.clearAll()
     return unsub
@@ -373,15 +366,7 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
       setLoadingMore(false);
     }
   },
-  [
-    initialScrollDone,
-    loadingMore,
-    hasMore,
-    fetchMessages,
-    earliestMessageId,
-    messages,
-    cancelEdit
-  ]
+  [initialScrollDone, loadingMore, hasMore, fetchMessages, earliestMessageId, messages]
 );
 
 
@@ -739,24 +724,18 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
         }
         <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
           <div className={`avatar 
-            ${conversation.directConversationId && (headerData.isOnline ? 'avatar-online' : 'avatar-offline')}`}>
+            ${conversation.directConversationId && (true ? 'avatar-online' : 'avatar-offline')}`}>
             <div className="w-6 rounded-full">
-              <img src={conversation.directConversationId ? getPfpByFilePath(headerData.pfpFilePath) : getPfpByFilePath(conversationPfpFilePath)} />
+              <img src={conversation.directConversationId ? getPfpByFilePath(conversation.pfpFilePath) : getPfpByFilePath(conversationPfpFilePath)} />
             </div>
           </div>
-          <div className='ml-2 text-white'>{conversation.directConversationId ? headerData.name : conversationName}</div>
+          <div className='ml-2 text-white'>{conversation.directConversationId ? conversationName : conversationName}</div>
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>
           <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} data={messages} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length: undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>
         </div>
       <div>
-        {replyMessage && 
-          <div
-            className={`text-sm flex justify-between ${replyMessage.senderId ? 'opacity-100' : 'opacity-0'}`}
-          >
-            Replying to {getUsername(replyMessage.senderId)}<button onClick={()=>setReplyMessage(null)}>X</button>
-          </div>}
         <div className='relative'>
           <div className="absolute right-0 bottom-full" ref={pickerRef}>
             <EmojiPicker 
@@ -769,28 +748,39 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
             open={shouldOpenPicker}
             />
           </div>
-          <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-center p-2 mt-3'>
-            <textarea
-              id="chat-message"
-              rows={1}
-              placeholder="Type a message..."
-              value={newMessage}
-              onChange={(e) => {
-                setNewMessage(e.target.value);
-                e.currentTarget.style.height = 'auto'; // Reset height
-                e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // Resize
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-              ref={textareaRef}
-              className="focus:outline-none textarea-md w-[90%] resize-none overflow-auto !min-h-0"
-            />
-            <div className='group hover:bg-base-100 p-1 rounded-md' ref={pickerIconRef}>
-              <SmileIcon onClick={handlePicker} className={`hover:cursor-pointer group-hover:text-gray-400 ${shouldOpenPicker ? '!text-white' : 'text-gray-600'}`} />
+
+          <div className='mt-3'>
+            {replyMessage && 
+            <div
+              className={`text-sm flex justify-between`}
+            >
+              Replying to {getUsername(replyMessage.senderId)}
+              
+              <XIcon className='hover:cursor-pointer text-gray-400 hover:text-white' onClick={()=>setReplyMessage(null)}/>
+            </div>}
+            <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-center p-2'>
+              <textarea
+                id="chat-message"
+                rows={1}
+                placeholder="Type a message..."
+                value={newMessage}
+                onChange={(e) => {
+                  setNewMessage(e.target.value);
+                  e.currentTarget.style.height = 'auto'; // Reset height
+                  e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // Resize
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+                ref={textareaRef}
+                className="focus:outline-none textarea-md w-[90%] resize-none overflow-auto !min-h-0"
+              />
+              <div className='group hover:bg-base-100 p-1 rounded-md' ref={pickerIconRef}>
+                <SmileIcon onClick={handlePicker} className={`hover:cursor-pointer group-hover:text-gray-400 ${shouldOpenPicker ? '!text-white' : 'text-gray-600'}`} />
+              </div>
             </div>
           </div>
         </div>

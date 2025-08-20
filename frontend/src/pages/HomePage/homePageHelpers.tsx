@@ -72,7 +72,6 @@ export const subscribeConversations = (
   setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>,
   setLoading: (bool: boolean) => void
 ) => {
-  const conversationCache: Record<string, () => void> = {};
 
   const convQuery = query(
     collection(db, 'conversations'),
@@ -91,82 +90,17 @@ export const subscribeConversations = (
             name: await serializeName(data.name, data.participants, userId),
             hiddenBy: data.hiddenBy || [],
             participants: data.participants || [],
-            pfpFilePath: data.pfpFilePath || null,
-            directConversationId: data.directConversationId || null,
+            pfpFilePath: data.pfpFilePath,
+            directConversationId: data.directConversationId,
             isOnline: false,
           };
         })
       );
-
-      setConversations((prev) =>
-        conversations.map((newConv) => {
-          const existing = prev.find((c) => c.id === newConv.id);
-          // Only preserve isOnline from existing, get fresh pfpFilePath from new data
-          return {
-            ...newConv,
-            isOnline: existing?.isOnline ?? false,
-            // Don't fall back to existing pfpFilePath - use the fresh one from conversation data
-            pfpFilePath: newConv.pfpFilePath,
-          };
-        })
-      );
-
-      // Clean up listeners for conversations that no longer exist
-      const currentConvIds = conversations.map(conv => conv.id);
-      Object.keys(conversationCache).forEach(convId => {
-        if (!currentConvIds.includes(convId)) {
-          conversationCache[convId]();
-          delete conversationCache[convId];
-        }
-      });
-
-      // Set up new listeners for direct conversations ONLY
-      for (const conv of conversations) {
-        if (!conv.directConversationId) {
-          // Remove listener if this is no longer a direct conversation
-          if (conversationCache[conv.id]) {
-            conversationCache[conv.id]();
-            delete conversationCache[conv.id];
-          }
-          continue;
-        }
-        
-        if (conv.id in conversationCache) continue;
-
-        const otherUserId = conv.participants.find((p) => p !== userId);
-        if (!otherUserId) continue;
-
-        const userRef = doc(db, 'users', otherUserId);
-        const unsubDirect = onSnapshot(userRef, (snapshot) => {
-          if (!snapshot.exists()) return;
-
-          const data = snapshot.data();
-          setConversations((prev) =>
-            prev.map((c) => {
-              if (c.id !== conv.id) return c;
-              // Only update direct conversations with user data
-              return {
-                ...c,
-                name: data.username ?? 'Deleted User',
-                pfpFilePath: data.pfpFilePath || c.pfpFilePath, // User's PFP for direct conversations
-                isOnline: data.isOnline ?? false,
-              };
-            })
-          );
-        });
-
-        conversationCache[conv.id] = unsubDirect;
-      }
-    },
-    (error) => {
-      console.error('Error subscribing to conversations:', error);
-      setLoading(false);
-    }
-  );
+      setConversations(conversations);
+  })
 
   return () => {
     unsubConversations();
-    Object.values(conversationCache).forEach((unsub) => unsub());
     setLoading(false);
   };
 };

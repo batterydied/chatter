@@ -314,9 +314,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                             </div>
                             <div className='ml-2 p-2 w-full bg-base-300'>
                                 {selectedConversation ? 
-                                <ConversationWindow conversation={selectedConversation} userId={appUser!.id} headerData={
-                                    recentConversations.find((c)=>c.id== selectedConversation.id) || selectedConversation
-                                }/>
+                                <ConversationWindow conversation={selectedConversation} userId={appUser!.id} />
                                 : 
                                 <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
                                 }
