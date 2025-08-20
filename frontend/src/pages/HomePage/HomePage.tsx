@@ -82,6 +82,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                     requestId: reqDoc.id,
                     from: data.from,
                     username: userData.username,
+                    pfpFilePath: userData.pfpFilePath
                 };
             })
         );
@@ -222,26 +223,33 @@ const HomePage = ({user, logOut} : HomeProps) => {
                     return (
                         <div style={style}>
                             <div className='p-2 hover:bg-base-200 flex justify-between'>
-                                <div className='flex flex-col items-start'>
-                                    <div>
-                                        {request.username}
-                                    </div>
-                                    <div className='text-xs'>
-                                        {request.from}
-                                    </div>
-                                </div>
-                                <div className='flex items-center'>
-                                    <div onClick={()=>handleAccept(request.requestId)}className='w-[30px] h-[30px] rounded-full bg-green-600 mr-6 hover:cursor-pointer hover:bg-green-700 active:bg-green-800 flex justify-center items-center'>
-                                        <div>
-                                            <CheckIcon className='text-black'/>
+                                <div className='flex flex-row items-center'>
+                                    <div className='avatar mr-2'>
+                                        <div className='h-10 rounded-full'>
+                                            <img src={getPfpByFilePath(request.pfpFilePath)}/>
                                         </div>
                                     </div>
-                                    <div onClick={()=>handleDecline(request.requestId)} className='w-[30px] h-[30px] rounded-full bg-red-600 hover:cursor-pointer hover:bg-red-700 active:bg-red-800 flex justify-center items-center'>
+                                    <div className='flex flex-col items-start justify-center'>
                                         <div>
-                                            <XIcon className='text-black' />
+                                            {request.username}
+                                        </div>
+                                        <div className='text-xs'>
+                                            {request.from}
                                         </div>
                                     </div>
                                 </div>
+                                    <div className='flex items-center'>
+                                        <div onClick={()=>handleAccept(request.requestId)}className='w-[30px] h-[30px] rounded-full bg-green-600 mr-6 hover:cursor-pointer hover:bg-green-700 active:bg-green-800 flex justify-center items-center'>
+                                            <div>
+                                                <CheckIcon className='text-black'/>
+                                            </div>
+                                        </div>
+                                        <div onClick={()=>handleDecline(request.requestId)} className='w-[30px] h-[30px] rounded-full bg-red-600 hover:cursor-pointer hover:bg-red-700 active:bg-red-800 flex justify-center items-center'>
+                                            <div>
+                                                <XIcon className='text-black' />
+                                            </div>
+                                        </div>
+                                    </div>
                             </div>
                         </div>
                     )

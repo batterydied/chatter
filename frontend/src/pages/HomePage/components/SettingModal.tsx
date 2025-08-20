@@ -54,7 +54,7 @@ const SettingModal = ({logOut, user}: SettingModalProps) => {
             }
             toast.success('Profile updated successfully!')
         }catch(e){
-            console.log(e)
+            console.error(e)
             toast.error('Failed to update profile')
         }
     }
@@ -65,7 +65,6 @@ const SettingModal = ({logOut, user}: SettingModalProps) => {
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
-        console.log(file)
         if (!file) return
         setPreviewUrl(URL.createObjectURL(file))
         setShouldOpenAvatarEditor(true)

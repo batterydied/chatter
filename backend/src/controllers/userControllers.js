@@ -22,7 +22,8 @@ class UserController{
             const data = {
                 id: doc.id,
                 ...doc.data(),
-                createdAt
+                createdAt,
+                lastReadReq: createdAt
             }
             res.status(201).json({status: 'Success', message: 'User created', user: data})
         }catch(e){

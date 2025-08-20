@@ -62,7 +62,7 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [inputMessage, setInputMessage] = useState('')
+  const [newMessage, setNewMessage] = useState('')
   const [earliestMessageId, setEarliestMessageId] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<SerializedMessage | null>(null)
   const [editMessage, setEditMessage] = useState<SerializedMessage | null>(null)
@@ -84,20 +84,12 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
 
   const cacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
 
-  const textareaElRef = useRef<HTMLTextAreaElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const editTextareRef = useRef<HTMLTextAreaElement | null>(null)
   const listRef = useRef<List>(null)
   const measureRef = useRef<(() => void) | null>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
   const pickerIconRef = useRef<HTMLDivElement>(null)
-
-  const textareaRef = useCallback((ele: HTMLTextAreaElement | null) => {
-    if(ele){
-      textareaElRef.current = ele;
-      const len = ele.value.length
-      ele.setSelectionRange(len, len)
-      ele.focus();
-    }
-  }, []);
 
   useEffect(()=>{
     const unsub = onSnapshot(doc(db, 'conversations', conversation.id), (snapshot)=>{
@@ -183,12 +175,12 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
   }
   
   const handleSubmit = () => {
-    if(inputMessage){
-      uploadMessage(conversation.id, userId, inputMessage, replyMessage != null, replyMessage?.id || '')
-      setInputMessage('')
+    if(newMessage){
+      uploadMessage(conversation.id, userId, newMessage, replyMessage != null, replyMessage?.id || '')
+      setNewMessage('')
     }
-    if (textareaElRef.current) {
-      textareaElRef.current.style.height = 'auto';
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
     }
   }
 
@@ -215,21 +207,27 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
   }
 
   const handleEdit = (msg: SerializedMessage) => {
+    if(editMessage){
+      cancelEdit()
+    }
     setEditMessage(msg)
     setEditMessageInputMessage(msg.text)
     const idx = messages.findIndex((m)=> m.id == msg.id)
-    if(idx >= 0) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
+    if(idx >= 0){
+      cacheRef.current.clear(idx, 0); 
+      listRef.current?.recomputeRowHeights(idx)
+    }
   }
   
-  const cancelEdit = () => {
+  const cancelEdit = useCallback(() => {
     const idx = messages.findIndex((m)=> m.id == editMessage?.id)
     setEditMessage(null)
     if(idx >= 0) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
-  }
+  }, [editMessage?.id, messages])
 
   const handleReply = (msg: SerializedMessage) => {
     setReplyMessage(msg)
-    textareaElRef.current?.focus();
+    textareaRef.current?.focus();
   }
 
   const handleUpdate = useCallback(async (msg: SerializedMessage, updatedMsg: string) => {
@@ -256,13 +254,9 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
       await sendUpdate(msg.id, updatedMsg)
     }
 
-    const idx = messages.findIndex((m) => m.id == msg.id)
-    setEditMessage(null)
+    cancelEdit()
     
-    if(idx >= 0) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation.id])
+  }, [cancelEdit, conversation.id])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -314,7 +308,6 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
     updateDoc(msgRef, {reactions: updatedReactions})
 
     const idx = messages.findIndex((m) => m.id == msgId)
-    console.log(listRef.current)
     if(idx >=0 ) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
   }
 
@@ -463,7 +456,14 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
                   <div>
                     <textarea
                       id='edit-message'
-                      ref={textareaRef}
+                      ref={(el)=>{
+                        editTextareRef.current = el
+                        if(el){
+                          const len = el.value.length
+                          el.setSelectionRange(len, len)
+                          el.focus();
+                        }
+                      }}
                       onChange={(e) => {
                         setEditMessageInputMessage(e.target.value)
                       }}
@@ -471,8 +471,8 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
                       value={editMessageInputMessage}
                     />
                     <p className="text-sm">
-                      Escape to <span className="text-accent">cancel</span>, enter to{' '}
-                      <span className="text-accent">save</span>
+                      Escape to <span className="text-accent">cancel</span>, enter to 
+                      <span className="text-accent"> save</span>
                     </p>
                   </div>
                 ) : (
@@ -689,9 +689,9 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
       await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`, message)
     }catch(e){
       if(axios.isAxiosError(e)){
-        console.log(e.message)
+        console.error(e.message)
       }else{
-        console.log('Unknown error occurred')
+        console.error('Unknown error occurred')
       }
     }
   }
@@ -738,8 +738,8 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
           <div className="absolute right-0 bottom-full" ref={pickerRef}>
             <EmojiPicker 
             onEmojiClick={(emojiObj)=>{
-              setInputMessage(prev => prev + emojiObj.emoji)
-              textareaElRef.current?.focus();
+              setNewMessage(prev => prev + emojiObj.emoji)
+              textareaRef.current?.focus();
             }} 
             theme={'dark' as Theme}
             lazyLoadEmojis={true}
@@ -751,9 +751,9 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
               id="chat-message"
               rows={1}
               placeholder="Type a message..."
-              value={inputMessage}
+              value={newMessage}
               onChange={(e) => {
-                setInputMessage(e.target.value);
+                setNewMessage(e.target.value);
                 e.currentTarget.style.height = 'auto'; // Reset height
                 e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // Resize
               }}

@@ -29,7 +29,8 @@ export type Friend = {
 type OutgoingRequest = {
     to: string,
     username: string,
-    id: string
+    id: string,
+    pfpFilePath: string
 }
 
 const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
@@ -124,12 +125,19 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     return (
                         <div style={style}>
                             <div className='p-2 hover:bg-base-200 flex justify-between'>
-                                <div className='flex flex-col items-start'>
-                                    <div>
-                                        {request.username}
+                                <div className='flex flex-row items-center'>
+                                    <div className='avatar mr-2'>
+                                        <div className='h-10 rounded-full'>
+                                            <img src={getPfpByFilePath(request.pfpFilePath)}/>
+                                        </div>
                                     </div>
-                                    <div className='text-xs'>
-                                        {request.to}
+                                    <div className='flex flex-col items-start'>
+                                        <div>
+                                            {request.username}
+                                        </div>
+                                        <div className='text-xs'>
+                                            {request.to}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className='btn bg-red-600 hover:bg-red-700 active:bg-red-800' onClick={()=>handleWithdraw(request.id)}>
@@ -141,7 +149,6 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 }}
             </CellMeasurer>
         )
-
     }
     
     const validateRequest = async () => {
@@ -308,9 +315,10 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             if (!docSnap.exists()) return null;
             const data = docSnap.data();
             return {
-            to: req.to,
-            id: req.id,
-            username: data.username,
+                to: req.to,
+                id: req.id,
+                username: data.username,
+                pfpFilePath: data.pfpFilePath
             };
         })
         );
@@ -435,9 +443,9 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         }catch(e){
             if(axios.isAxiosError(e)){
                 toast.error(e.response?.data.message)
-                console.log(e.response?.data.error)
+                console.error(e.response?.data.error)
             }else{
-                console.log(e)
+                console.error(e)
             }
         }
     }

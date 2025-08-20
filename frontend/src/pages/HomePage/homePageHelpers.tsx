@@ -14,7 +14,8 @@ export type AppUser = {
 export type FriendRequest = {
     requestId: string,
     from: string,
-    username: string
+    username: string,
+    pfpFilePath: string
 }
 
 export type Conversation = {
@@ -43,7 +44,7 @@ export const fetchUserFromDB = async (
             newUserSetter(true);
             setLoading(false)
         }else{
-            console.log('Unknown error occurred')
+            console.error('Unknown error occurred')
         }
     }
 }
@@ -55,14 +56,13 @@ export const createUser = async (uid: string, email: string, username: string, s
             email,
             username
         }
-        console.log(fields)
         const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/user`, fields)
         setAppUser(res.data.user)
     }catch(e){
         if (axios.isAxiosError(e)) {
-            console.log(e.message)
+            console.error(e.message)
         }else{
-            console.log('Unknown error occurred')
+            console.error('Unknown error occurred')
         }
     }
 }
@@ -190,7 +190,6 @@ export const serializeName = async (name: string, participants: string[], userId
 }
 
 export const getPfpByFilePath = (filePath: string) => {
-    console.log(filePath)
     if(!filePath){
         return supabase.storage.from('avatars').getPublicUrl('default/default_user.png').data.publicUrl
     }
