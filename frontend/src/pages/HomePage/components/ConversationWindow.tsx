@@ -76,6 +76,7 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
   const [selectedMessageId, setSelectedMessageId] = useState('')
   const [conversationName, setConversationName] = useState('')
   const [conversationPfpFilePath, setConversationPfpFilePath] = useState('')
+  const [shouldRecomputeAllRows, setShouldRecomputeAllRows] = useState(false)
 
   const [usernameRecord, setUsernameRecord] = useState<Record<string, string>>({})
   const [pfpRecord, setPfpRecord] = useState<Record<string, string>>({})
@@ -98,9 +99,8 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
       setConversationPfpFilePath(prev => data.pfpFilePath == prev ? prev : data.pfpFilePath)
       setConversationName(prev => data.name == prev ? prev : data.name)
     })
-
+    cacheRef.current.clearAll()
     return unsub
-   
   }, [conversation])
 
   const fetchMessages = useCallback(async (size: number, prevMessageId: string | null) => {
@@ -206,17 +206,14 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
     }
   }
 
-  const handleEdit = (msg: SerializedMessage) => {
+  const handleEdit = (msg: SerializedMessage, index: number) => {
     if(editMessage){
       cancelEdit()
     }
+    cacheRef.current.clear(index, 0)
     setEditMessage(msg)
     setEditMessageInputMessage(msg.text)
-    const idx = messages.findIndex((m)=> m.id == msg.id)
-    if(idx >= 0){
-      cacheRef.current.clear(idx, 0); 
-      listRef.current?.recomputeRowHeights(idx)
-    }
+    listRef.current?.recomputeRowHeights(index)
   }
   
   const cancelEdit = useCallback(() => {
@@ -333,41 +330,67 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
     setSelectedMessageId('')
     setIsReactSelected(false)
   }
+
   const handleScroll = useCallback(
-    async ({scrollTop, clientHeight, scrollHeight}:{scrollTop: number, clientHeight: number, scrollHeight: number}) => {
-      if (!initialScrollDone || !listRef.current || loadingMore || !hasMore) return;
-      
-      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
-      const threshold = 75;
-      setIsNearBottom(distanceFromBottom < threshold);
+  async ({
+    scrollTop,
+    clientHeight,
+    scrollHeight,
+  }: {
+    scrollTop: number;
+    clientHeight: number;
+    scrollHeight: number;
+  }) => {
+    if (!initialScrollDone || !listRef.current || loadingMore || !hasMore) return;
+    // Track near-bottom for auto-scroll on new messages
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+    const threshold = 75;
+    setIsNearBottom(distanceFromBottom < threshold);
 
-      if (scrollTop < 150) {
-        setLoadingMore(true);
-        const list = listRef.current
-        const moreMessages = await fetchMessages(15, earliestMessageId);
-        if(!moreMessages) return 
-        const newEarliestId = moreMessages.length > 0 ? moreMessages[0].id : earliestMessageId;
-        const newMessages = [...moreMessages, ...messages];
+    // If we're near the top, load older messages
+    if (scrollTop < 10) {
+      setLoadingMore(true);
 
-        const addedHeight = moreMessages.reduce((sum, _, i) => {
-          return sum + cacheRef.current.rowHeight({ index: i })
-        }, 0);
-
-        setMessages(newMessages);
-        setEarliestMessageId(newEarliestId);
-        cacheRef.current.clearAll();
-
-        requestAnimationFrame(() => {
-          list.recomputeRowHeights();
-          requestAnimationFrame(() => {
-            listRef.current?.scrollToPosition(scrollTop + addedHeight);
-            setLoadingMore(false);
-          });
-        });
+      // Fetch older messages
+      const moreMessages = await fetchMessages(15, earliestMessageId);
+      if (!moreMessages?.length) {
+        setLoadingMore(false);
+        return;
       }
-    },
-    [fetchMessages, hasMore, loadingMore, earliestMessageId, initialScrollDone, messages]
-  );
+
+      // Prepend older messages
+      const newMessages = [...moreMessages, ...messages];
+      setMessages(newMessages);
+
+      // Update earliest message ID
+      const newEarliestId = newMessages[0].id;
+      setEarliestMessageId(newEarliestId);
+
+      setShouldRecomputeAllRows(true)
+
+      requestAnimationFrame(()=>{listRef.current?.scrollToRow(moreMessages.length)})
+
+      setLoadingMore(false);
+    }
+  },
+  [
+    initialScrollDone,
+    loadingMore,
+    hasMore,
+    fetchMessages,
+    earliestMessageId,
+    messages,
+    cancelEdit
+  ]
+);
+
+
+  useEffect(()=>{
+    if(!shouldRecomputeAllRows) return
+    cacheRef.current.clearAll()
+    listRef.current?.recomputeRowHeights()
+    setShouldRecomputeAllRows(false)
+  }, [shouldRecomputeAllRows])
 
   const getPfpById = (id: string) => {
     const url =  pfpRecord[id] || 'default/default_user.png'
@@ -379,149 +402,149 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
   }
 
   const renderMessages: ListRowRenderer = ({ index, key, parent, style }) => {
-  const msg = messages[index]
-  const prev = index > 0 ? messages[index - 1] : null
-  const isGrouped =
-    prev &&
-    prev.senderId === msg.senderId &&
-    Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000
-  const isHovered = hoveredMessageId === msg.id
-  const isUser = userId === msg.senderId
-  const isEditingMessage = editMessage?.id === msg.id
-  const isReply = replyMessage?.id === msg.id
-  const repliedMessageId = msg.replyId
-  let repliedMessage: SerializedMessage | null = null
-  if (repliedMessageId !== '') {
-    repliedMessage = messages.find((m) => m.id === repliedMessageId) || null
-  }
+    const msg = messages[index]
+    const prev = index > 0 ? messages[index - 1] : null
+    const isGrouped =
+      prev &&
+      prev.senderId === msg.senderId &&
+      Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000
+    const isHovered = hoveredMessageId === msg.id
+    const isUser = userId === msg.senderId
+    const isEditingMessage = editMessage?.id === msg.id
+    const isReply = replyMessage?.id === msg.id
+    const repliedMessageId = msg.replyId
+    let repliedMessage: SerializedMessage | null = null
+    if (repliedMessageId !== '') {
+      repliedMessage = messages.find((m) => m.id === repliedMessageId) || null
+    }
 
-  return (
-    <CellMeasurer
-      key={key}
-      cache={cacheRef.current}
-      parent={parent}
-      columnIndex={0}
-      rowIndex={index}
-    >
-      {({measure}) => {
-        measureRef.current = measure
-        return (
-          <div
-            style={style}
-            className="relative"
-            onMouseLeave={() => {
-              handleRemoveHoverId()
-            }}
-            onMouseEnter={() => {
-              handleSelectHoverId(msg.id)
-            }}
-          >
+    return (
+      <CellMeasurer
+        key={key}
+        cache={cacheRef.current}
+        parent={parent}
+        columnIndex={0}
+        rowIndex={index}
+      >
+        {({measure}) => {
+          measureRef.current = measure
+          return (
             <div
-              className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
-                isReply && isHovered
-                  ? 'bg-blue-900'
-                  : isReply
-                  ? 'bg-blue-950'
-                  : isHovered
-                  ? 'bg-base-200'
-                  : 'bg-base-300'
-              } relative text-left whitespace-normal`}
+              style={style}
+              className="relative"
+              onMouseLeave={() => {
+                handleRemoveHoverId()
+              }}
+              onMouseEnter={() => {
+                handleSelectHoverId(msg.id)
+              }}
             >
-              <div className="chat-image avatar">
-                <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
-                  <img src={getPfpById(msg.senderId)}/>
+              <div
+                className={`chat rounded-md ${isUser ? 'chat-end' : 'chat-start'} ${
+                  isReply && isHovered
+                    ? 'bg-blue-900'
+                    : isReply
+                    ? 'bg-blue-950'
+                    : isHovered
+                    ? 'bg-base-200'
+                    : 'bg-base-300'
+                } relative text-left whitespace-normal`}
+              >
+                <div className="chat-image avatar">
+                  <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
+                    <img src={getPfpById(msg.senderId)}/>
+                  </div>
+                </div>
+                {!isGrouped && (
+                  <div className="chat-header">
+                    <p>{getUsername(msg.senderId)}</p>
+                    <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
+                  </div>
+                )}
+
+                {isEditingMessage ? (
+                    <div className='chat-bubble w-full bg-base-100'>
+                      <textarea
+                        id='edit-message'
+                        ref={(el)=>{
+                          editTextareRef.current = el
+                          if(el){
+                            if(textareaRef.current && document.activeElement !== textareaRef.current){
+                              const len = el.value.length
+                              el.setSelectionRange(len, len)
+                              el?.focus({ preventScroll: true });
+                            }
+                          }
+                        }}
+                        onChange={(e) => {
+                          setEditMessageInputMessage(e.target.value)
+                        }}
+                        className="textarea w-full focus:outline-none border-0 focus:shadow-none shadow-none resize-none"
+                        value={editMessageInputMessage}
+                      />
+                      <p className="text-sm">
+                        Escape to <span className="text-accent">cancel</span>, enter to 
+                        <span className="text-accent"> save</span>
+                      </p>
+                    </div>):(
+                    <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+                      <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
+                        {repliedMessageId === '' ? null : repliedMessage ? (
+                          <>
+                            <div className="flex justify-start text-gray-400">
+                              Replying to {getUsername(repliedMessage.senderId)}
+                            </div>
+                            <div className="flex justify-start">{repliedMessage.text}</div>
+                          </>
+                        ) : (
+                          <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
+                        )}
+                      </div>
+                      <div className="break-words whitespace-normal">
+                        {msg.text}
+                      </div>
+                    </div>)}
+                <div className="chat-footer mt-1 text-lg">
+                  <Reactions
+                    msgId={msg.id}
+                    reactions={msg.reactions}
+                    appUserId={userId}
+                    handleIncrement={handleIncrement}
+                    handleDecrement={handleDecrement}
+                  />
                 </div>
               </div>
-              {!isGrouped && (
-                <div className="chat-header">
-                  <p>{getUsername(msg.senderId)}</p>
-                  <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
-                </div>
+
+              {msg.isEdited && (
+                  <span
+                    className={`text-xs text-accent flex w-full ${isUser ? 'justify-end': 'justify-start'}`}
+                  >
+                    (edited)
+                  </span>
               )}
-              <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-                <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
-                  {repliedMessageId === '' ? null : repliedMessage ? (
-                    <>
-                      <div className="flex justify-start text-gray-400">
-                        Replying to {getUsername(repliedMessage.senderId)}
-                      </div>
-                      <div className="flex justify-start">{repliedMessage.text}</div>
-                    </>
-                  ) : (
-                    <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
+      
+              {isHovered && (
+                <div className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center">
+                  <SmileIcon onClick={
+                    ()=>{
+                      setIsReactSelected(true)
+                      setSelectedMessageId(msg.id)
+                    }
+                  } className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
+                  {userId == msg.senderId && (
+                      <EditIcon onClick={() => handleEdit(msg, index)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
+                  )}
+                  <ReplyIcon onClick={() => handleReply(msg)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
+                  {userId == msg.senderId && (
+                      <DeleteIcon onClick={() => handleDeleteConfirmation(msg)} className="text-red-800 hover:text-red-600 hover:cursor-pointer mx-1" />
                   )}
                 </div>
-      
-                {isEditingMessage ? (
-                  <div>
-                    <textarea
-                      id='edit-message'
-                      ref={(el)=>{
-                        editTextareRef.current = el
-                        if(el){
-                          const len = el.value.length
-                          el.setSelectionRange(len, len)
-                          el.focus();
-                        }
-                      }}
-                      onChange={(e) => {
-                        setEditMessageInputMessage(e.target.value)
-                      }}
-                      className="textarea w-full focus:outline-none border-0 focus:shadow-none shadow-none resize-none"
-                      value={editMessageInputMessage}
-                    />
-                    <p className="text-sm">
-                      Escape to <span className="text-accent">cancel</span>, enter to 
-                      <span className="text-accent"> save</span>
-                    </p>
-                  </div>
-                ) : (
-                  <div className="break-words whitespace-normal">
-                    {msg.text}
-                  </div>
-                )}
-              </div>
-              <div className="chat-footer mt-1 text-lg">
-                <Reactions
-                  msgId={msg.id}
-                  reactions={msg.reactions}
-                  appUserId={userId}
-                  handleIncrement={handleIncrement}
-                  handleDecrement={handleDecrement}
-                />
-              </div>
+              )}
             </div>
-
-            {msg.isEdited && (
-                <span
-                  className={`text-xs text-accent flex w-full ${isUser ? 'justify-end': 'justify-start'}`}
-                >
-                  (edited)
-                </span>
-            )}
-    
-            {isHovered && (
-              <div className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center">
-                <SmileIcon onClick={
-                  ()=>{
-                    setIsReactSelected(true)
-                    setSelectedMessageId(msg.id)
-                  }
-                } className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
-                {userId == msg.senderId && (
-                    <EditIcon onClick={() => handleEdit(msg)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
-                )}
-                <ReplyIcon onClick={() => handleReply(msg)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
-                {userId == msg.senderId && (
-                    <DeleteIcon onClick={() => handleDeleteConfirmation(msg)} className="text-red-800 hover:text-red-600 hover:cursor-pointer mx-1" />
-                )}
-              </div>
-            )}
-          </div>
-          )}}
-    </CellMeasurer>
-  )
-}
+            )}}
+      </CellMeasurer>
+    )
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -710,7 +733,7 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
         {isReactSelected && 
             <div className="absolute inset-0 z-[99999] flex items-center justify-center" onClick={()=>setIsReactSelected(false)}>
                 <div onClick={(e)=>e.stopPropagation()}>
-                  <EmojiPicker theme={'dark' as Theme} onEmojiClick={(e)=>handleReact(e.emoji)}/>
+                  <EmojiPicker lazyLoadEmojis={true} theme={'dark' as Theme} onEmojiClick={(e)=>handleReact(e.emoji)}/>
                 </div>
             </div>
         }
@@ -725,7 +748,7 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>
-          <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} data={messages} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length - 1 : undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>
+          <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} data={messages} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length: undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>
         </div>
       <div>
         {replyMessage && 
