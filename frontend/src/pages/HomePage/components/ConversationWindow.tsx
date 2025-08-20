@@ -718,14 +718,14 @@ const ConversationWindow = ({ conversation, userId, headerData }: ConversationWi
           <div className={`avatar 
             ${conversation.directConversationId && (headerData.isOnline ? 'avatar-online' : 'avatar-offline')}`}>
             <div className="w-6 rounded-full">
-              <img src={conversation.directConversationId ? getPfpById(headerData.pfpFilePath) : getPfpByFilePath(conversationPfpFilePath)} />
+              <img src={conversation.directConversationId ? getPfpByFilePath(headerData.pfpFilePath) : getPfpByFilePath(conversationPfpFilePath)} />
             </div>
           </div>
           <div className='ml-2 text-white'>{conversation.directConversationId ? headerData.name : conversationName}</div>
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>
-          <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} rowCount={messages.length} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length - 1 : undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>
+          <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} data={messages} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length - 1 : undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>
         </div>
       <div>
         {replyMessage && 

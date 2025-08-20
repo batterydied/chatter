@@ -1,23 +1,18 @@
-import type { RefObject } from "react"
-import { AutoSizer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
+import { AutoSizer, List } from "react-virtualized"
+import type { ModalBaseProps } from "../../../utils/ModalBaseProps";
 
 type ScrollProps = {
     scrollTop: number;
     clientHeight: number;
     scrollHeight: number;
 }
-type ConversationDashboardProps = {
-    cacheRef: RefObject<CellMeasurerCache>,
-    listRef: RefObject<List | null>,
-    renderer: ListRowRenderer,
-    rowCount: number,
-    className?: string,
+type ConversationDashboardProps = ModalBaseProps & {
     scrollToIndex?: number | undefined
     onScroll?: (props: ScrollProps) => Promise<void>
     rowKey?: (params: { index: number }) => string
 }
 
-const VList = ({cacheRef, listRef, renderer, rowCount, className, scrollToIndex, onScroll, rowKey}: ConversationDashboardProps) => {
+const VList = ({cacheRef, listRef, renderer, data, className, scrollToIndex, onScroll, rowKey}: ConversationDashboardProps) => {
     return (
         <AutoSizer>
             {({width, height})=>
@@ -26,7 +21,7 @@ const VList = ({cacheRef, listRef, renderer, rowCount, className, scrollToIndex,
                     height={height}
                     rowHeight={cacheRef.current.rowHeight}
                     deferredMeasurementCache={cacheRef.current}
-                    rowCount={rowCount}
+                    rowCount={data.length}
                     rowRenderer={renderer}
                     ref={listRef}
                     className={className}

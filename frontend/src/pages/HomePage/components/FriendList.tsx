@@ -452,10 +452,10 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                     <button className='btn bg-primary rounded-lg' onClick={handleAddFriend}>Add Friend</button>
                 </div>
             </div>
-            <VList cacheRef={cacheRef} listRef={listRef} renderer={renderFriends} rowCount={selectedOnline ? onlineFriends.length : friends.length}/>
+            <VList cacheRef={cacheRef} listRef={listRef} renderer={renderFriends} data={selectedOnline ? onlineFriends : friends}/>
             <RemoveFriendConfirmationModal removeFriend={removeFriend} setRemoveFriend={setRemoveFriend} sendRemove={sendRemove} />
             <AddFriendModal handleSend={handleSend} searchId={searchId} setSearchId={setSearchId} userId={userId} handleCloseRequest={handleCloseRequest} errorMessage={errorMessage} successRequestMessage={successRequestMessage}/>
-            <OutgoingRequestModal cacheRef={cacheRef} listRef={listRef} renderer={renderRequests} rowCount={outgoingRequests.length} setModalOpen={setModalOpen}/>
+            <OutgoingRequestModal cacheRef={cacheRef} listRef={listRef} renderer={renderRequests} data={outgoingRequests} setModalOpen={setModalOpen}/>
         </div>
     )
 

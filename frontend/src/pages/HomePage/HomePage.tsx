@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
-import { fetchUserFromDB, getPfpByFilePath, subscribeConversation, subscribeDirectConversation } from './homePageHelpers'
+import { fetchUserFromDB, getPfpByFilePath, subscribeConversations } from './homePageHelpers'
 import type { AppUser, Conversation, FriendRequest } from './homePageHelpers'
 import NewUserModal from './components/NewUserPage'
 import FriendList from './components/FriendList'
@@ -39,6 +39,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const conversationListRef = useRef<List>(null)
 
     const navigate = useNavigate();
+
     useEffect(()=>{
         setVisibleConversations(recentConversations.filter((c)=>!c.hiddenBy.includes(appUser?.id || '')))
     }, [recentConversations, appUser])
@@ -139,17 +140,10 @@ const HomePage = ({user, logOut} : HomeProps) => {
     
     useEffect(()=>{
         if(appUser){
-            const unsub = subscribeConversation(appUser.id, setRecentConversations, setLoading)
+            const unsub = subscribeConversations(appUser.id, setRecentConversations, setLoading)
             return unsub
         }
     }, [appUser])
-
-    useEffect(()=>{
-        if(appUser){
-            const unsub = subscribeDirectConversation(recentConversations, setRecentConversations, conversationRecordRef.current, appUser.id)
-            return unsub
-        }
-    }, [appUser, recentConversations])
 
     const handleDeclineAll = async () => {
         if(!appUser) return
@@ -213,7 +207,6 @@ const HomePage = ({user, logOut} : HomeProps) => {
                 }}
             </CellMeasurer>
         )
-
     }
     const renderRequests: ListRowRenderer= ({ index, key, parent, style }) => {
         const request = friendRequests[index]
@@ -294,7 +287,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                     <div className='my-1 flex justify-start text-gray-600 text-sm'>
                                         Direct Messages
                                     </div>
-                                    <VList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} rowCount={visibleConversations.length} className='overflow-x-hidden'/> 
+                                    <VList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
                                 </ul>
                                 <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
                                     <div className='flex flex-row items-center'>
@@ -320,7 +313,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
                                 }
                             </div>
-                            <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} rowCount={friendRequests.length} setModalOpen={setModalOpen} handleDeclineAll={handleDeclineAll}/>
+                            <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} setModalOpen={setModalOpen} handleDeclineAll={handleDeclineAll}/>
 
                             <SettingModal user={appUser} logOut={logOut}/>
                         </div>

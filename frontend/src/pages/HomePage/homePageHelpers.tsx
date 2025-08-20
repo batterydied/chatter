@@ -2,7 +2,6 @@ import axios from 'axios'
 import { db } from '../../config/firebase'
 import { collection, where, query, onSnapshot, doc, getDoc, orderBy } from 'firebase/firestore'
 import { supabase } from '../../config/supabase'
-import type { Dispatch, SetStateAction } from 'react'
 
 export type AppUser = {
     id: string,
@@ -68,77 +67,109 @@ export const createUser = async (uid: string, email: string, username: string, s
     }
 }
 
-export const subscribeConversation = (
-    userId: string, 
-    setter: React.Dispatch<React.SetStateAction<Conversation[]>>,
-    setLoading: (isLoading: boolean)=>void,
+export const subscribeConversations = (
+  userId: string,
+  setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>,
+  setLoading: (bool: boolean) => void
 ) => {
-    const queryRef = query(
-      collection(db, 'conversations'),
-      where('participants', 'array-contains', userId),
-      orderBy('lastMessageTime', 'desc')
-    );
-    const unsub = onSnapshot(queryRef, async (snapshot)=>{
-        const conversations: Conversation[] = await Promise.all(snapshot.docs.map(async (doc)=>{
-            const data = doc.data()
-            return {
-                id: doc.id,
-                name: await serializeName(data.name, data.participants, userId),
-                hiddenBy: data.hiddenBy,
-                participants: data.participants,
-                pfpFilePath: data.pfpFilePath,
-                directConversationId: data.directConversationId,
-                isOnline: false
-            }
-        }))
-        setter(prev => 
-            conversations.map(newConv => {
-                const existing = prev.find(c => c.id === newConv.id);
-                return {
-                ...newConv,
-                isOnline: existing?.isOnline ?? false,
-                };
-            })
-        )
-        setLoading(false)
-    })
+  const conversationCache: Record<string, () => void> = {};
 
-    return unsub
-}
+  const convQuery = query(
+    collection(db, 'conversations'),
+    where('participants', 'array-contains', userId),
+    orderBy('lastMessageTime', 'desc')
+  );
 
-export const subscribeDirectConversation = (
-    conversations: Conversation[], 
-    setConversations: Dispatch<SetStateAction<Conversation[]>>,
-    conversationRecord: Record<string, ()=>void>,
-    appUserId: string,
-) => {
-    for(const conversation of conversations){
-        if(conversation.id in conversationRecord || !conversation.directConversationId) continue
-        const userRef = doc(db, 'users', conversation.participants.filter((p) => p != appUserId)[0])
-        const unsub = onSnapshot(userRef, (snapshot)=>{
-            setConversations(prev =>
-                prev.map(c => {
-                    if (c.id !== conversation.id) return c;
-                    
-                    const updatedConversation = {
-                        name: 'Deleted User',
-                        pfpFilePath: '',
-                        isOnline: false
-                    }
-                    if(snapshot.exists()) {
-                        const data = snapshot.data()
-                        updatedConversation.name = data.username
-                        updatedConversation.pfpFilePath = data.pfpFilePath
-                        updatedConversation.isOnline = data.isOnline
-                    }
-
-                    return { ...c, ...updatedConversation };
-                })
-            );
+  const unsubConversations = onSnapshot(
+    convQuery, 
+    async (snapshot) => {
+      const conversations: Conversation[] = await Promise.all(
+        snapshot.docs.map(async (doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: await serializeName(data.name, data.participants, userId),
+            hiddenBy: data.hiddenBy || [],
+            participants: data.participants || [],
+            pfpFilePath: data.pfpFilePath || null,
+            directConversationId: data.directConversationId || null,
+            isOnline: false,
+          };
         })
-        conversationRecord[conversation.id] = unsub
+      );
+
+      setConversations((prev) =>
+        conversations.map((newConv) => {
+          const existing = prev.find((c) => c.id === newConv.id);
+          // Only preserve isOnline from existing, get fresh pfpFilePath from new data
+          return {
+            ...newConv,
+            isOnline: existing?.isOnline ?? false,
+            // Don't fall back to existing pfpFilePath - use the fresh one from conversation data
+            pfpFilePath: newConv.pfpFilePath,
+          };
+        })
+      );
+
+      // Clean up listeners for conversations that no longer exist
+      const currentConvIds = conversations.map(conv => conv.id);
+      Object.keys(conversationCache).forEach(convId => {
+        if (!currentConvIds.includes(convId)) {
+          conversationCache[convId]();
+          delete conversationCache[convId];
+        }
+      });
+
+      // Set up new listeners for direct conversations ONLY
+      for (const conv of conversations) {
+        if (!conv.directConversationId) {
+          // Remove listener if this is no longer a direct conversation
+          if (conversationCache[conv.id]) {
+            conversationCache[conv.id]();
+            delete conversationCache[conv.id];
+          }
+          continue;
+        }
+        
+        if (conv.id in conversationCache) continue;
+
+        const otherUserId = conv.participants.find((p) => p !== userId);
+        if (!otherUserId) continue;
+
+        const userRef = doc(db, 'users', otherUserId);
+        const unsubDirect = onSnapshot(userRef, (snapshot) => {
+          if (!snapshot.exists()) return;
+
+          const data = snapshot.data();
+          setConversations((prev) =>
+            prev.map((c) => {
+              if (c.id !== conv.id) return c;
+              // Only update direct conversations with user data
+              return {
+                ...c,
+                name: data.username ?? 'Deleted User',
+                pfpFilePath: data.pfpFilePath || c.pfpFilePath, // User's PFP for direct conversations
+                isOnline: data.isOnline ?? false,
+              };
+            })
+          );
+        });
+
+        conversationCache[conv.id] = unsubDirect;
+      }
+    },
+    (error) => {
+      console.error('Error subscribing to conversations:', error);
+      setLoading(false);
     }
-}
+  );
+
+  return () => {
+    unsubConversations();
+    Object.values(conversationCache).forEach((unsub) => unsub());
+    setLoading(false);
+  };
+};
 
 export const serializeName = async (name: string, participants: string[], userId: string) => {
     const MAX_LENGTH = 15
@@ -159,6 +190,7 @@ export const serializeName = async (name: string, participants: string[], userId
 }
 
 export const getPfpByFilePath = (filePath: string) => {
+    console.log(filePath)
     if(!filePath){
         return supabase.storage.from('avatars').getPublicUrl('default/default_user.png').data.publicUrl
     }

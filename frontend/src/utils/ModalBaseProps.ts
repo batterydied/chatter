@@ -5,5 +5,6 @@ export type ModalBaseProps = {
   cacheRef: RefObject<CellMeasurerCache>;
   listRef: RefObject<List | null>;
   renderer: ListRowRenderer;
-  rowCount: number;
+  data: unknown[];
+  className?: string
 };

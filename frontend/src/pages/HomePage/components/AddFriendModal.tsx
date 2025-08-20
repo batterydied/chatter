@@ -6,7 +6,6 @@ type AddFriendModalProps = {
     setSearchId: (id: string) => void,
     searchId: string,
     handleSend: () => Promise<void>
-
 }
 
 const isValidSearchId = (searchId: string) => {

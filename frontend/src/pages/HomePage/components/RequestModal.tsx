@@ -5,7 +5,7 @@ type RequestModalProps = ModalBaseProps & {
     setModalOpen: (open: boolean) => void,
     handleDeclineAll: () => Promise<void>
 }
-const RequestModal = ({cacheRef, listRef, renderer, rowCount, setModalOpen, handleDeclineAll} : RequestModalProps) => {
+const RequestModal = ({cacheRef, listRef, renderer, data, setModalOpen, handleDeclineAll} : RequestModalProps) => {
     return (
         <dialog id="request_modal" className="modal" onCancel={()=>setModalOpen(false)}>
             <div className="modal-box">
@@ -13,13 +13,13 @@ const RequestModal = ({cacheRef, listRef, renderer, rowCount, setModalOpen, hand
                     {/* if there is a button in form, it will close the modal */}
                     <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={()=>setModalOpen(false)}>✕</button>
                     <h3 className="font-bold text-lg">Incoming Requests</h3>
-                    {rowCount === 0 ?  <h3>There are no incoming requests.</h3> :
+                    {data.length === 0 ?  <h3>There are no incoming requests.</h3> :
                     <div className='h-64'>
-                        <VList cacheRef={cacheRef} listRef={listRef} rowCount={rowCount} renderer={renderer}/>
+                        <VList cacheRef={cacheRef} listRef={listRef} data={data} renderer={renderer}/>
                     </div>
                     }
                 </form>
-                {rowCount !== 0 &&
+                {data.length !== 0 &&
                 <div className='mt-2 flex justify-end'>
                     <button className='btn bg-red-500' onClick={handleDeclineAll}>
                         Decline All
