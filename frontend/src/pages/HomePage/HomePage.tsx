@@ -49,12 +49,22 @@ const HomePage = ({user, logOut} : HomeProps) => {
             return;
         }
         if(user.email){
-            const checkUser = async (email: string) => {
-                await fetchUserFromDB(email, setIsNewUser, setAppUser, setLoading)
-            }
-            checkUser(user.email)
+            fetchUserFromDB(user.email, setIsNewUser, setAppUser, setLoading)
         }
     }, [user, navigate])
+
+    useEffect(()=>{
+        if(!appUser?.id) return
+        const appUserRef = doc(db, 'users', appUser.id)
+        const unsub = onSnapshot(appUserRef, (snapshot) => {
+            if(!snapshot.exists()) return
+            const data = snapshot.data()
+            setAppUser(prev => {
+                if(!prev) return prev
+                return {...prev, username: data.username, pfpFilePath: data.pfpFilePath}})
+        })
+        return unsub
+    }, [appUser?.id])
 
     const handleSetFriendRequests = async (docs: DocumentSnapshot[]) => {
         const results = await Promise.all(
