@@ -33,7 +33,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [modalOpen, setModalOpen] = useState(false)
     const requestCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const requestListRef = useRef<List>(null)
-    const conversationRecordRef = useRef<Record<string, ()=>void>>({})
+    const directConversationRecordRef = useRef<Record<string, ()=>void>>({})
 
     const conversationCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const conversationListRef = useRef<List>(null)
@@ -66,6 +66,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
         })
         return unsub
     }, [appUser?.id])
+
 
     const handleSetFriendRequests = async (docs: DocumentSnapshot[]) => {
         const results = await Promise.all(
@@ -119,9 +120,9 @@ const HomePage = ({user, logOut} : HomeProps) => {
     }, [appUser])
 
     useEffect(() => {
-        for(const unsub of Object.values(conversationRecordRef.current)) unsub()
+        for(const unsub of Object.values(directConversationRecordRef.current)) unsub()
 
-        conversationRecordRef.current = {}
+        directConversationRecordRef.current = {}
     }, [appUser])
 
     useEffect(() => {
@@ -141,10 +142,10 @@ const HomePage = ({user, logOut} : HomeProps) => {
     
     useEffect(()=>{
         if(appUser){
-            const unsub = subscribeConversations(appUser.id, setRecentConversations, setLoading)
+            const unsub = subscribeConversations(appUser.id, recentConversations, setRecentConversations, setLoading, directConversationRecordRef.current)
             return unsub
         }
-    }, [appUser])
+    }, [appUser, recentConversations])
 
     const handleDeclineAll = async () => {
         if(!appUser) return

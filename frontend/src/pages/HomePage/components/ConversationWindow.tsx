@@ -69,8 +69,6 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const [shouldOpenPicker, setShouldOpenPicker] = useState(false)
   const [isReactSelected, setIsReactSelected] = useState(false)
   const [selectedMessageId, setSelectedMessageId] = useState('')
-  const [conversationName, setConversationName] = useState('')
-  const [conversationPfpFilePath, setConversationPfpFilePath] = useState('')
   const [shouldRecomputeAllRows, setShouldRecomputeAllRows] = useState(false)
 
   const [usernameRecord, setUsernameRecord] = useState<Record<string, string>>({})
@@ -87,17 +85,9 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   const pickerRef = useRef<HTMLDivElement>(null)
   const pickerIconRef = useRef<HTMLDivElement>(null)
 
-  useEffect(()=>{
-    const unsub = onSnapshot(doc(db, 'conversations', conversation.id), (snapshot)=>{
-      if(!snapshot.exists()) return
-      const data = snapshot.data()
-    })
-    cacheRef.current.clearAll()
-    return unsub
-  }, [conversation])
-
   const fetchMessages = useCallback(async (size: number, prevMessageId: string | null) => {
     const params = {size, prevMessageId}
+    cacheRef.current.clearAll()
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversation.id}/message/page`,
@@ -361,8 +351,8 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
 
       setShouldRecomputeAllRows(true)
 
-      requestAnimationFrame(()=>{listRef.current?.scrollToRow(moreMessages.length)})
-
+      requestAnimationFrame(()=>{listRef.current?.scrollToRow(moreMessages.length + 4)}) //unable to anchor the correct position so did some testing (it's a fudge factor)
+      
       setLoadingMore(false);
     }
   },
@@ -724,12 +714,12 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         }
         <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
           <div className={`avatar 
-            ${conversation.directConversationId && (true ? 'avatar-online' : 'avatar-offline')}`}>
+            ${conversation.directConversationId && (conversation.isOnline ? 'avatar-online' : 'avatar-offline')}`}>
             <div className="w-6 rounded-full">
-              <img src={conversation.directConversationId ? getPfpByFilePath(conversation.pfpFilePath) : getPfpByFilePath(conversationPfpFilePath)} />
+              <img src={getPfpByFilePath(conversation.pfpFilePath)} />
             </div>
           </div>
-          <div className='ml-2 text-white'>{conversation.directConversationId ? conversationName : conversationName}</div>
+          <div className='ml-2 text-white'>{conversation.name}</div>
         </div>
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>
