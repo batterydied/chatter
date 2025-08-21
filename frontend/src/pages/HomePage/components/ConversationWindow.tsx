@@ -16,6 +16,7 @@ import DeleteMessageModal from './DeleteMessageModal'
 import { Reactions, type Reaction } from './Reactions'
 import VList from './VList'
 import serializeMessages from '../../../utils/serializeMessages'
+import ConversationHeader from './ConversationHeader'
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -712,15 +713,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
                 </div>
             </div>
         }
-        <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
-          <div className={`avatar 
-            ${conversation.directConversationId && (conversation.isOnline ? 'avatar-online' : 'avatar-offline')}`}>
-            <div className="w-6 rounded-full">
-              <img src={getPfpByFilePath(conversation.pfpFilePath)} />
-            </div>
-          </div>
-          <div className='ml-2 text-white'>{conversation.name}</div>
-        </div>
+        <ConversationHeader src={getPfpByFilePath(conversation.pfpFilePath)} name={conversation.name} isDirect={conversation.directConversationId != ''} isOnline={conversation.isOnline} />
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>
           <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} data={messages} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length: undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>
