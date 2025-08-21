@@ -14,7 +14,7 @@ class MessageController{
                 (doc) => ({
                     id: doc.id,
                     ...doc.data(),
-                    createdAt: doc.data().createdAt.toDate().toISOString()
+                    createdAt: doc.data().createdAt
                 })
             )})
         }catch(e){
@@ -34,7 +34,7 @@ class MessageController{
                 {
                     messageId,
                     ...messageDoc.data(),
-                    createdAt: messageDoc.data().createdAt.toDate().toISOString()
+                    createdAt: messageDoc.data().createdAt
 
                 }
             })
@@ -81,7 +81,7 @@ class MessageController{
                 {
                     messageId: messageDoc.id,
                     ...messageDoc.data(),
-                    createdAt: messageDoc.data().createdAt.toDate().toISOString()
+                    createdAt: messageDoc.data().createdAt
                 }
             })
         }catch(e){
@@ -166,7 +166,7 @@ class MessageController{
             const messages = snapshot.docs.map((doc) => ({
                 id: doc.id,
                 ...doc.data(),
-                createdAt: doc.data().createdAt.toDate().toISOString()
+                createdAt: doc.data().createdAt
             })).reverse()
 
             const noMore = snapshot.size < size

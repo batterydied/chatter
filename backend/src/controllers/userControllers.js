@@ -18,7 +18,7 @@ class UserController{
             const docRef = await addDoc(collectionRef, user)
 
             const doc = await getDoc(docRef)
-            const createdAt = doc.data().createdAt.toDate().toISOString()
+            const createdAt = doc.data().createdAt
             const data = {
                 id: doc.id,
                 ...doc.data(),
@@ -43,7 +43,7 @@ class UserController{
             const data = {
                 id: docSnap.id,
                 ...docSnap.data(),
-                createdAt: docSnap.data().createdAt.toDate().toISOString()
+                createdAt: docSnap.data().createdAt
             };
 
             res.status(200).json({ status: 'Success', user: data });
@@ -62,7 +62,7 @@ class UserController{
                 const data = [querySnapshot.docs[0]].map(doc => ({
                     id: doc.id,
                     ...doc.data(),
-                    createdAt: doc.data().createdAt.toDate().toISOString()
+                    createdAt: doc.data().createdAt
                 }))[0]
                 res.status(200).json({status: 'Success', user: data})
             }

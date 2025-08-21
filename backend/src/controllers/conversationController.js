@@ -33,7 +33,7 @@ class ConversationController{
                 {
                     conversationId: docSnapshot.id,
                     ...docSnapshot.data(),
-                    createdAt: docSnapshot.data().createdAt.toDate().toISOString()
+                    createdAt: docSnapshot.data().createdAt
                 }
             })
         }catch(e){
@@ -53,7 +53,7 @@ class ConversationController{
                 {
                     conversationId,
                     ...docSnapshot.data(),
-                    createdAt: docSnapshot.data().createdAt.toDate().toISOString()
+                    createdAt: docSnapshot.data().createdAt
                 }
             })
         }catch(e){

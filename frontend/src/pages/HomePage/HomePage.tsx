@@ -1,12 +1,12 @@
 import type { User } from 'firebase/auth'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { fetchUserFromDB, getPfpByFilePath, subscribeConversations } from './homePageHelpers'
 import type { AppUser, Conversation, FriendRequest } from './homePageHelpers'
 import NewUserModal from './components/NewUserPage'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
-import { CheckIcon, GearsIcon, RequestIcon, UserIcon, XIcon } from '../../assets/icons'
+import { CheckIcon, GearsIcon, UserIcon, XIcon } from '../../assets/icons'
 import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
@@ -16,6 +16,7 @@ import Loading from './components/Loading'
 import RequestModal from './components/RequestModal'
 import VList from './components/VList'
 import SettingModal from './components/SettingModal'
+import FriendRequestBtn from './components/FriendRequestBtn'
 
 type HomeProps = {
     user: User | null
@@ -83,7 +84,8 @@ const HomePage = ({user, logOut} : HomeProps) => {
                     requestId: reqDoc.id,
                     from: data.from,
                     username: userData.username,
-                    pfpFilePath: userData.pfpFilePath
+                    pfpFilePath: userData.pfpFilePath,
+                    createdAt: data.createdAt
                 };
             })
         );
@@ -162,6 +164,14 @@ const HomePage = ({user, logOut} : HomeProps) => {
         
         await batch.commit();
     }
+
+    const calcUnreadRequest = useMemo(() => {
+        if(!appUser) return 0
+        console.log(new Date(appUser.createdAt))
+
+        return friendRequests.reduce((acc, req)=> new Date(req.createdAt) > new Date(appUser.lastSeenRequest) ?  acc + 1 : acc
+        , 0)
+    }, [appUser, friendRequests])
 
     const handleHideConversation = async (e: React.MouseEvent, conversation: Conversation) => {
         e.stopPropagation()
@@ -287,10 +297,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                         </button>
                                     </li>
                                     <li>
-                                        <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 text-gray-400 hover:text-white' onClick={handleOpenRequest}>
-                                            <RequestIcon className='text-gray-400 group-hover:text-white'/>
-                                            Requests
-                                        </button>
+                                        <FriendRequestBtn onClick={handleOpenRequest} count={calcUnreadRequest} />
                                     </li>
                                     <div className='border-b border-gray-700 pb-2' />
                                     <div className='my-1 flex justify-start text-gray-600 text-sm'>

@@ -1,3 +1,4 @@
+import formatMessageTime from "../../../utils/formatMessageTime"
 import type { SerializedMessage } from "./ConversationWindow"
 
 
@@ -24,7 +25,7 @@ const DeleteMessageModal = ({deleteMessage, username, sendDelete, setDeleteMessa
             <div className='chat chat-end bg-base-100 p-2 m-6 rounded-md'>
                 <div className="chat-header">
                     {username}
-                    <time className="text-xs opacity-50 ml-2">{deleteMessage?.messageTime}</time>
+                    <time className="text-xs opacity-50 ml-2">{deleteMessage && formatMessageTime(deleteMessage.createdAt)}</time>
                 </div>
                 <div className={`chat-bubble mt-3`}>
                     {deleteMessage && deleteMessage.text.length > 500 ? deleteMessage.text.slice(0, 500) + '...' : deleteMessage?.text}

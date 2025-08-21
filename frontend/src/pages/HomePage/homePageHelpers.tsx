@@ -8,14 +8,16 @@ export type AppUser = {
     createdAt: string,
     username: string,
     email: string,
-    pfpFilePath: string
+    pfpFilePath: string,
+    lastSeenRequest: string
 }
 
 export type FriendRequest = {
     requestId: string,
     from: string,
     username: string,
-    pfpFilePath: string
+    pfpFilePath: string,
+    createdAt: string
 }
 
 export type Conversation = {

@@ -14,7 +14,7 @@ class RelationController{
             const requests = querySnapshot.docs.map(request => ({
                 id: request.id,
                 data: request.data(),
-                createdAt: request.data().createdAt.toDate().toISOString()
+                createdAt: request.data().createdAt
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
@@ -32,7 +32,7 @@ class RelationController{
             const requests = querySnapshot.docs.map(request => ({
                 id: request.id,
                 data: request.data(),
-                createdAt: request.data().createdAt.toDate().toISOString()
+                createdAt: request.data().createdAt
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
@@ -50,7 +50,7 @@ class RelationController{
             const requests = querySnapshot.docs.map(request => ({
                 id: request.id,
                 data: request.data(),
-                createdAt: request.data().createdAt.toDate().toISOString()
+                createdAt: request.data().createdAt
             }))
             res.status(200).json({status: "Success", requests})
         }catch(e){
@@ -68,7 +68,7 @@ class RelationController{
             const friends = querySnapshot.docs.map(friend => ({
                 id: friend.id,
                 data: friend.data(),
-                createdAt: friend.data().createdAt.toDate().toISOString()
+                createdAt: friend.data().createdAt
             }))
             res.status(200).json({status: "Success", friends})
         }catch(e){
@@ -91,7 +91,7 @@ class RelationController{
             const data = {
                 id: doc.id,
                 ...doc.data(),
-                createdAt: doc.data().createdAt.toDate().toISOString()
+                createdAt: doc.data().createdAt
             }
             res.status(201).json({status: 'Success', message: 'Friend request sent', request: data})
         }catch(e){

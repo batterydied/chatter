@@ -17,6 +17,7 @@ import { Reactions, type Reaction } from './Reactions'
 import VList from './VList'
 import serializeMessages from '../../../utils/serializeMessages'
 import ConversationHeader from './ConversationHeader'
+import formatMessageTime from '../../../utils/formatMessageTime'
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -25,7 +26,7 @@ type ConversationWindowProps = {
 
 export type RawMessage = {
   id: string,
-  createdAt: string | Timestamp, //if you get it from backend api, it's a string; if you use firebase snapshot, it's a timestamp
+  createdAt: Timestamp, 
   senderId: string,
   text: string,
   type: string,
@@ -41,9 +42,8 @@ export type RawMessage = {
 export type SerializedMessage = {
   id: string
   text: string
-  messageTime: string,
   senderId: string,
-  timestamp: Date,
+  createdAt: Date,
   isEdited: boolean,
   isReply: boolean,
   replyId: string,
@@ -383,7 +383,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     const isGrouped =
       prev &&
       prev.senderId === msg.senderId &&
-      Math.abs(new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 2 * 60 * 1000
+      Math.abs(msg.createdAt.getTime() - prev.createdAt.getTime()) < 2 * 60 * 1000
     const isHovered = hoveredMessageId === msg.id
     const isUser = userId === msg.senderId
     const isEditingMessage = editMessage?.id === msg.id
@@ -434,7 +434,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
                 {!isGrouped && (
                   <div className="chat-header">
                     <p>{getUsername(msg.senderId)}</p>
-                    <time className="text-xs opacity-50 ml-2">{msg.messageTime}</time>
+                    <time className="text-xs opacity-50 ml-2">{formatMessageTime(msg.createdAt)}</time>
                   </div>
                 )}
 
