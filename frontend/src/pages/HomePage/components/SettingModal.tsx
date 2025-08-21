@@ -72,7 +72,7 @@ const SettingModal = ({logOut, user}: SettingModalProps) => {
     }
 
     return (
-        <dialog id="setting_modal" className="modal">
+        <dialog id="setting_modal" className="modal" onClose={()=>setUsername(user.username)}>
             <div className="modal-box">
                 <form method="dialog" onSubmit={(e) => e.preventDefault()}>
                     {/* if there is a button in form, it will close the modal */}
@@ -102,7 +102,7 @@ const SettingModal = ({logOut, user}: SettingModalProps) => {
                         </div>
                     </div>
                 </form>
-                {isEdited() && <button className='btn' onClick={handleUpdateUser}>Save Changes</button>}
+                {isEdited() && username != '' && <button className='btn' onClick={handleUpdateUser}>Save Changes</button>}
                 <div className='mt-4 text-sm'>Press (esc) to exit out of setting</div>
             </div>
         </dialog>

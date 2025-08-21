@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { db } from '../../config/firebase'
-import { collection, where, query, onSnapshot, doc, getDoc, orderBy } from 'firebase/firestore'
+import { doc, getDoc, Timestamp } from 'firebase/firestore'
 import { supabase } from '../../config/supabase'
 
 export type AppUser = {
@@ -9,7 +9,7 @@ export type AppUser = {
     username: string,
     email: string,
     pfpFilePath: string,
-    lastSeenRequest: string
+    lastSeenRequest: Timestamp
 }
 
 export type FriendRequest = {
@@ -17,7 +17,7 @@ export type FriendRequest = {
     from: string,
     username: string,
     pfpFilePath: string,
-    createdAt: string
+    createdAt: Timestamp
 }
 
 export type Conversation = {
@@ -68,77 +68,6 @@ export const createUser = async (uid: string, email: string, username: string, s
         }
     }
 }
-
-export const subscribeConversations = (
-  userId: string,
-  recentConversations: Conversation[],
-  setRecentConversations: React.Dispatch<React.SetStateAction<Conversation[]>>,
-  setLoading: (bool: boolean) => void,
-  directConversationRecord: Record<string, ()=>void>
-) => {
-
-  const convQuery = query(
-    collection(db, 'conversations'),
-    where('participants', 'array-contains', userId),
-    orderBy('lastMessageTime', 'desc')
-  );
-
-  const unsub = onSnapshot(
-    convQuery, 
-    async (snapshot) => {
-      const conversations: Conversation[] = await Promise.all(
-        snapshot.docs.map(async (snapshotDoc) => {
-          const data = snapshotDoc.data()
-          const conversationTemplate = {
-            id: snapshotDoc.id,
-            pfpFilePath: data.pfpFilePath,
-            name: data.name,
-            isOnline: false,
-            directConversationId: data.directConversationId,
-            hiddenBy: data.hiddenBy,
-            participants: data.participants
-          }
-          if(data.directConversationId){
-            const userRef = doc(db, 'users', conversationTemplate.participants.filter((p: string)=>p != userId)[0])
-            const userSnapshot = await getDoc(userRef)
-            if(userSnapshot.exists()){
-              const userData = userSnapshot.data()
-              conversationTemplate.isOnline = userData.isOnline
-              conversationTemplate.name = userData.username
-              conversationTemplate.pfpFilePath = userData.pfpFilePath
-            }else{
-              conversationTemplate.name = 'Deleted User'
-              conversationTemplate.pfpFilePath = ''
-            }
-          }
-          return conversationTemplate
-        })
-      );
-      setRecentConversations(conversations);
-  })
-  
-  for(const conversation of recentConversations){
-    if(!conversation.directConversationId || directConversationRecord[conversation.id]) return
-    const userRef = doc(db, 'users', conversation.participants.filter((p: string)=>p != userId)[0])
-    const unsub = onSnapshot(userRef, (snapshot) => {
-      const updatedConversation = conversation
-      if(!snapshot.exists()){
-        updatedConversation.name = 'Deleted User'
-        updatedConversation.pfpFilePath = ''
-        updatedConversation.isOnline = false
-      }else{
-        const data = snapshot.data()
-        updatedConversation.name = data.username
-        updatedConversation.pfpFilePath = data.pfpFilePath
-        updatedConversation.isOnline = data.isOnline
-      }
-      setRecentConversations((prev) => prev.map((c)=>c.id != conversation.id ? c : updatedConversation))
-    })
-    directConversationRecord[conversation.id] = unsub
-  }
-  setLoading(false);
-  return unsub
-};
 
 export const serializeName = async (name: string, participants: string[], userId: string) => {
     const MAX_LENGTH = 15

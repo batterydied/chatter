@@ -2,7 +2,7 @@ import './App.css'
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import AuthPage from './pages/AuthPage/AuthPage';
 import HomePage from './pages/HomePage/HomePage';
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { auth } from './config/firebase'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import type { User } from 'firebase/auth'
@@ -46,7 +46,7 @@ function App() {
   usePresence(user);
   useSummaryStatus(user);
 
-  const logOut = async () => {
+  const logOut = useCallback(async () => {
     const user = auth.currentUser;
     const sessionId = sessionStorage.getItem('firebaseSessionId');
 
@@ -62,7 +62,7 @@ function App() {
     }
 
     await signOut(auth);
-  };
+  }, [])
 
   return (
     <>

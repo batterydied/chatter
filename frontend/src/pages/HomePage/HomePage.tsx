@@ -1,13 +1,13 @@
 import type { User } from 'firebase/auth'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { fetchUserFromDB, getPfpByFilePath, subscribeConversations } from './homePageHelpers'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { fetchUserFromDB, getPfpByFilePath } from './homePageHelpers'
 import type { AppUser, Conversation, FriendRequest } from './homePageHelpers'
 import NewUserModal from './components/NewUserPage'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
 import { CheckIcon, GearsIcon, UserIcon, XIcon } from '../../assets/icons'
-import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore'
+import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch, updateDoc, orderBy, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
 import axios from 'axios'
@@ -17,6 +17,7 @@ import RequestModal from './components/RequestModal'
 import VList from './components/VList'
 import SettingModal from './components/SettingModal'
 import FriendRequestBtn from './components/FriendRequestBtn'
+import { toDateSafe } from '../../utils/toDateSafe'
 
 type HomeProps = {
     user: User | null
@@ -32,6 +33,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
     const [modalOpen, setModalOpen] = useState(false)
+    const [unreadRequest, setUnreadRequest] = useState(0)
     const requestCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const requestListRef = useRef<List>(null)
     const directConversationRecordRef = useRef<Record<string, ()=>void>>({})
@@ -63,13 +65,19 @@ const HomePage = ({user, logOut} : HomeProps) => {
             const data = snapshot.data()
             setAppUser(prev => {
                 if(!prev) return prev
-                return {...prev, username: data.username, pfpFilePath: data.pfpFilePath}})
+                return {...prev, username: data.username, pfpFilePath: data.pfpFilePath, lastSeenRequest: data.lastSeenRequest || new Date()}})
         })
         return unsub
     }, [appUser?.id])
 
+    useEffect(()=>{
+        if(!appUser) return 
+        const count = friendRequests.reduce((acc, req)=> toDateSafe(req.createdAt) > toDateSafe(appUser.lastSeenRequest) ?  acc + 1 : acc
+        , 0)
+        setUnreadRequest(count)
+    }, [appUser, friendRequests])
 
-    const handleSetFriendRequests = async (docs: DocumentSnapshot[]) => {
+    const handleSetFriendRequests = useCallback(async (docs: DocumentSnapshot[]) => {
         const results = await Promise.all(
             docs.map(async (reqDoc) => {
                 const data = reqDoc.data() as FriendRequest | undefined;
@@ -89,24 +97,25 @@ const HomePage = ({user, logOut} : HomeProps) => {
                 };
             })
         );
-    const filtered = results.filter((r) => r !== null)
-    setFriendRequests(filtered)
-};
-    const handleDecline = async (requestId: string) => {
+        const filtered = results.filter((r) => r !== null)
+        setFriendRequests(filtered)
+    }, [])
+
+    const handleDecline = useCallback(async (requestId: string) => {
         try{
             await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/decline/${requestId}`)
         }catch{
             toast.error("Couldn't decline request, try again later.")
         }
-    }
+    }, [])
 
-    const handleAccept = async (requestId: string) => {
+    const handleAccept = useCallback(async (requestId: string) => {
         try{
             await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/confirm/${requestId}`)
         }catch{
             toast.error("Couldn't accept request, try again later.")
         }
-    }
+    }, [])
 
     useEffect(()=>{
         if(!appUser) return
@@ -119,7 +128,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
         })
 
         return unsub
-    }, [appUser])
+    }, [appUser, handleSetFriendRequests])
 
     useEffect(() => {
         for(const unsub of Object.values(directConversationRecordRef.current)) unsub()
@@ -142,14 +151,55 @@ const HomePage = ({user, logOut} : HomeProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [modalOpen]);
     
-    useEffect(()=>{
-        if(appUser){
-            const unsub = subscribeConversations(appUser.id, recentConversations, setRecentConversations, setLoading, directConversationRecordRef.current)
-            return unsub
-        }
-    }, [appUser, recentConversations])
+    useEffect(() => {
+        if(!appUser) return
+        const convQuery = query(
+            collection(db, 'conversations'),
+            where('participants', 'array-contains', appUser.id),
+            orderBy('lastMessageTime', 'desc')
+        );
 
-    const handleDeclineAll = async () => {
+        const unsubConversations = onSnapshot(convQuery, async (snapshot) => {
+            const conversations: Conversation[] = await Promise.all(
+            snapshot.docs.map(async (snapshotDoc) => {
+                const data = snapshotDoc.data()
+                const template: Conversation = {
+                id: snapshotDoc.id,
+                pfpFilePath: data.pfpFilePath,
+                name: data.name,
+                isOnline: false,
+                directConversationId: data.directConversationId,
+                hiddenBy: data.hiddenBy,
+                participants: data.participants,
+                };
+
+                if (data.directConversationId) {
+                const otherUserId = template.participants.find((p) => p !== appUser.id)!
+                const userSnapshot = await getDoc(doc(db, 'users', otherUserId))
+                if (userSnapshot.exists()) {
+                    const userData = userSnapshot.data()
+                    template.isOnline = userData.isOnline
+                    template.name = userData.username
+                    template.pfpFilePath = userData.pfpFilePath
+                } else {
+                    template.name = 'Deleted User'
+                    template.pfpFilePath = ''
+                }
+                }
+                return template
+            })
+            );
+
+            setRecentConversations(conversations)
+            setLoading(false)
+        });
+
+        return () => {
+            unsubConversations()
+        }
+        }, [appUser]);
+
+    const handleDeclineAll = useCallback(async () => {
         if(!appUser) return
         const queryRef = query(collection(db, 'relations'), 
         where("to", "==", appUser.id),
@@ -163,26 +213,26 @@ const HomePage = ({user, logOut} : HomeProps) => {
         snapshot.docs.forEach(doc => batch.delete(doc.ref));
         
         await batch.commit();
-    }
+    }, [appUser])
 
-    const calcUnreadRequest = useMemo(() => {
-        if(!appUser) return 0
-        console.log(new Date(appUser.createdAt))
-
-        return friendRequests.reduce((acc, req)=> new Date(req.createdAt) > new Date(appUser.lastSeenRequest) ?  acc + 1 : acc
-        , 0)
-    }, [appUser, friendRequests])
-
-    const handleHideConversation = async (e: React.MouseEvent, conversation: Conversation) => {
+    const handleHideConversation = useCallback(async (e: React.MouseEvent, conversation: Conversation) => {
         e.stopPropagation()
         if(selectedConversation?.id == conversation.id){
             setSelectedConversation(null)
         }
         const conversationRef = doc(db, 'conversations', conversation.id)
         await updateDoc(conversationRef, {hiddenBy: [...conversation.hiddenBy, appUser!.id]})
-    }
+    }, [appUser, selectedConversation?.id])
 
-    const renderConversations: ListRowRenderer = ({index, key, parent, style }) => {
+    const handleCloseRequestModal = useCallback(()=>{
+        if(appUser){
+            const userRef = doc(db, 'users', appUser.id)
+            updateDoc(userRef, {lastSeenRequest: serverTimestamp()})
+        }
+        setModalOpen(false)
+    }, [appUser])
+
+    const renderConversations: ListRowRenderer = useCallback(({index, key, parent, style }) => {
         const conversation = visibleConversations[index]
         const highlightConversation = selectedConversation?.id == conversation.id
         return (
@@ -219,8 +269,8 @@ const HomePage = ({user, logOut} : HomeProps) => {
                 }}
             </CellMeasurer>
         )
-    }
-    const renderRequests: ListRowRenderer= ({ index, key, parent, style }) => {
+    }, [handleHideConversation, selectedConversation?.id, visibleConversations])
+    const renderRequests: ListRowRenderer= useCallback(({ index, key, parent, style }) => {
         const request = friendRequests[index]
         return (
             <CellMeasurer
@@ -268,18 +318,23 @@ const HomePage = ({user, logOut} : HomeProps) => {
             </CellMeasurer>
         )
 
-    }
+    }, [friendRequests, handleAccept, handleDecline])
 
-    if(loading) return <Loading />
 
-    const handleOpenRequest = () => {
+    const handleOpenRequest = useCallback(() => {
         (document.getElementById('request_modal') as HTMLDialogElement)!.showModal();
         setModalOpen(true)
-    }
+    }, [])
 
-    const handleOpenSetting = () => {
+    const handleOpenSetting = useCallback(() => {
         (document.getElementById('setting_modal') as HTMLDialogElement)!.showModal()
-    }
+    }, [])
+
+    const handleClearSelectConversation = useCallback(() => {
+        setSelectedConversation(null)
+    }, [])
+
+    if(loading) return <Loading />
 
     return (
         <div className='w-full h-full flex justify-center items-center'>
@@ -291,13 +346,13 @@ const HomePage = ({user, logOut} : HomeProps) => {
                             <div className='min-w-[360px]'>
                                 <ul className='list h-5/6 overflow-y-auto overflow-x-hidden'>
                                     <li>
-                                        <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 text-gray-400 hover:text-white' onClick={()=>setSelectedConversation(null)}>
+                                        <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 text-gray-400 hover:text-white' onClick={handleClearSelectConversation}>
                                             <UserIcon className='text-gray-400 group-hover:text-white' />
                                             Friends
                                         </button>
                                     </li>
                                     <li>
-                                        <FriendRequestBtn onClick={handleOpenRequest} count={calcUnreadRequest} />
+                                        <FriendRequestBtn onClick={handleOpenRequest} count={modalOpen ? 0 : unreadRequest} />
                                     </li>
                                     <div className='border-b border-gray-700 pb-2' />
                                     <div className='my-1 flex justify-start text-gray-600 text-sm'>
@@ -327,7 +382,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                 <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
                                 }
                             </div>
-                            <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} setModalOpen={setModalOpen} handleDeclineAll={handleDeclineAll}/>
+                            <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} onClose={handleCloseRequestModal} handleDeclineAll={handleDeclineAll}/>
 
                             <SettingModal user={appUser} logOut={logOut}/>
                         </div>

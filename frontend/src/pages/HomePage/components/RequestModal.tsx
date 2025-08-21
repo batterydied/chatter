@@ -2,16 +2,17 @@ import VList from "./VList"
 import type { ModalBaseProps } from "../../../utils/ModalBaseProps"
 
 type RequestModalProps = ModalBaseProps & {
-    setModalOpen: (open: boolean) => void,
+    onClose: () => void,
     handleDeclineAll: () => Promise<void>
 }
-const RequestModal = ({cacheRef, listRef, renderer, data, setModalOpen, handleDeclineAll} : RequestModalProps) => {
+
+const RequestModal = ({cacheRef, listRef, renderer, data, onClose, handleDeclineAll} : RequestModalProps) => {
     return (
-        <dialog id="request_modal" className="modal" onCancel={()=>setModalOpen(false)}>
+        <dialog id="request_modal" className="modal" onCancel={onClose}>
             <div className="modal-box">
                 <form method="dialog">
                     {/* if there is a button in form, it will close the modal */}
-                    <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={()=>setModalOpen(false)}>✕</button>
+                    <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                     <h3 className="font-bold text-lg">Incoming Requests</h3>
                     {data.length === 0 ?  <h3>There are no incoming requests.</h3> :
                     <div className='h-64'>

@@ -10,7 +10,7 @@ class UserController{
             email: req.body.email,
             createdAt: serverTimestamp(),
             isOnline: true,
-            pfpFilePath: ''
+            pfpFilePath: '',
         }
         try{
             UserSchema.parse(user);
@@ -23,7 +23,7 @@ class UserController{
                 id: doc.id,
                 ...doc.data(),
                 createdAt,
-                lastReadReq: createdAt
+                lastSeenRequest: createdAt
             }
             res.status(201).json({status: 'Success', message: 'User created', user: data})
         }catch(e){

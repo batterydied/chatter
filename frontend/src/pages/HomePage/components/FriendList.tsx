@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, deleteDoc, updateDoc } from 'firebase/firestore'
@@ -151,7 +151,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         )
     }
     
-    const validateRequest = async () => {
+    const validateRequest = useCallback(async () => {
         if(searchId == userId){
             setErrorMessage("You can't add yourself.")
             return false
@@ -189,9 +189,9 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
         setSuccessRequestMessage(false)
         return false
-    }
+    }, [searchId, userId])
 
-    const sendRequest = async () => {
+    const sendRequest = useCallback(async () => {
         try{
             await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/friend-request`, {
                 from: userId,
@@ -203,26 +203,26 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         }catch{
             toast.error('Could not send friend request, check the user ID.')
         }
-    }
+    }, [searchId, userId])
 
-    const handleSend = async () => {
+    const handleSend = useCallback(async () => {
         if(await validateRequest()){
             sendRequest()
         }
-    }   
+    }, [sendRequest, validateRequest])
 
-    const handleCloseRequest = () => {
+    const handleCloseRequest = useCallback(async () => {
         setSearchId('')
         setSuccessRequestMessage(false)
         setErrorMessage('')
-    }
+    }, [])
 
     const handleOutgoingRequest = () => {
         (document.getElementById('outgoing_request_modal') as HTMLDialogElement)!.showModal();
         setModalOpen(true)
     }
 
-    const sendRemove = async (friendId: string) => {
+    const sendRemove = useCallback(async (friendId: string) => {
         try{
             await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/relation/delete-friend`, {
                 data: {
@@ -238,9 +238,55 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         }catch{
             toast.error('Could not remove friend, try again later.')
         }
-    }
+    }, [friends, userId])
 
-    const renderFriends: ListRowRenderer = ({ index, key, parent, style }) => {
+    const openConversation = useCallback(async (userId1: string, userId2: string, isOnline: boolean) => {
+        const queryRef = query(collection(db, 'conversations'), where('directConversationId', '==', [userId1, userId2].sort().join('_')))
+        try{
+            const docSnapshot = await getDocs(queryRef)
+
+            if(docSnapshot.empty){
+                const reqBody = {
+                    participants: [userId1, userId2],
+                    isDirect: true
+                }
+                const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation`, reqBody)
+                const data = res.data.data
+                const conversation = {
+                    id: data.conversationId,
+                    name: await serializeName(data.name, data.participants, userId),
+                    hiddenBy: data.hiddenBy,
+                    participants: data.participants,
+                    pfpFilePath: data.pfpFilePath,
+                    directConversationId: data.directConversationId,
+                    isOnline
+                }
+                setSelectedConversation(conversation)
+            }else{
+                const selectedDoc = docSnapshot.docs[0]
+                const data = selectedDoc.data()
+                setSelectedConversation({
+                    id: selectedDoc.id,
+                    name: await serializeName(data.name, data.participants, userId),
+                    hiddenBy: data.hiddenBy,
+                    participants: data.participants,
+                    pfpFilePath: data.pfpFilePath,
+                    directConversationId: data.directConversationId,
+                    isOnline
+                })
+                await updateDoc(selectedDoc.ref, {hiddenBy: selectedDoc.data().hiddenBy.filter((id: string) => id !== userId)})
+            }
+        }catch(e){
+            if(axios.isAxiosError(e)){
+                toast.error(e.response?.data.message)
+                console.error(e.response?.data.error)
+            }else{
+                console.error(e)
+            }
+        }
+    }, [setSelectedConversation, userId])
+
+    const renderFriends: ListRowRenderer = useCallback(({ index, key, parent, style }) => {
         let friend: Friend
         if(!selectedOnline){
             friend = friends[index]
@@ -275,7 +321,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 }
             </CellMeasurer>
         )
-    };
+    }, [friends, onlineFriends, openConversation, selectedOnline, userId])
 
     const serializeRequest = async (docs: DocumentSnapshot[]) => {
         const unfiltered = await Promise.all(docs.map(async (d)=>{
@@ -404,51 +450,6 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         friendDict.current = {}
     }, [userId])
 
-    const openConversation = async (userId1: string, userId2: string, isOnline: boolean) => {
-        const queryRef = query(collection(db, 'conversations'), where('directConversationId', '==', [userId1, userId2].sort().join('_')))
-        try{
-            const docSnapshot = await getDocs(queryRef)
-
-            if(docSnapshot.empty){
-                const reqBody = {
-                    participants: [userId1, userId2],
-                    isDirect: true
-                }
-                const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation`, reqBody)
-                const data = res.data.data
-                const conversation = {
-                    id: data.conversationId,
-                    name: await serializeName(data.name, data.participants, userId),
-                    hiddenBy: data.hiddenBy,
-                    participants: data.participants,
-                    pfpFilePath: data.pfpFilePath,
-                    directConversationId: data.directConversationId,
-                    isOnline
-                }
-                setSelectedConversation(conversation)
-            }else{
-                const selectedDoc = docSnapshot.docs[0]
-                const data = selectedDoc.data()
-                setSelectedConversation({
-                    id: selectedDoc.id,
-                    name: await serializeName(data.name, data.participants, userId),
-                    hiddenBy: data.hiddenBy,
-                    participants: data.participants,
-                    pfpFilePath: data.pfpFilePath,
-                    directConversationId: data.directConversationId,
-                    isOnline
-                })
-                await updateDoc(selectedDoc.ref, {hiddenBy: selectedDoc.data().hiddenBy.filter((id: string) => id !== userId)})
-            }
-        }catch(e){
-            if(axios.isAxiosError(e)){
-                toast.error(e.response?.data.message)
-                console.error(e.response?.data.error)
-            }else{
-                console.error(e)
-            }
-        }
-    }
     if(!isReady) return <Loading />
     return (
         <div className='list justify-start h-full overflow-hidden'>
