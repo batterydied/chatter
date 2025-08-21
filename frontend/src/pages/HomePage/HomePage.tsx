@@ -104,6 +104,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const handleDecline = useCallback(async (requestId: string) => {
         try{
             await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/decline/${requestId}`)
+            setFriendRequests((prev)=>prev.filter((r) => r.requestId != requestId))
         }catch{
             toast.error("Couldn't decline request, try again later.")
         }
@@ -112,6 +113,7 @@ const HomePage = ({user, logOut} : HomeProps) => {
     const handleAccept = useCallback(async (requestId: string) => {
         try{
             await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/confirm/${requestId}`)
+            setFriendRequests((prev)=>prev.filter((r) => r.requestId != requestId))
         }catch{
             toast.error("Couldn't accept request, try again later.")
         }
