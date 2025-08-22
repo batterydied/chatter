@@ -25,8 +25,10 @@ app.get('/', (req, res) => {
     res.send({message: 'You have reached the server.'})
 })
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`)
-})
+if(process.env.MODE !== 'production'){
+  app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`)
+  })
+}
 
 export default app
