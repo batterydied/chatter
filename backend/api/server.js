@@ -1,12 +1,12 @@
 import 'dotenv/config'
 import express from "express"
-import UserRoutes from "./routes/userRoutes.js"
-import RelationRoutes from "./routes/relationRoutes.js"
-import ConversationRoutes from "./routes/conversationRoutes.js"
+import UserRoutes from "../src/routes/userRoutes.js"
+import RelationRoutes from "../src/routes/relationRoutes.js"
+import ConversationRoutes from "../src/routes/conversationRoutes.js"
 import cors from 'cors'
 
 const app = express()
-const PORT = 5001
+const PORT = process.env.PORT || 5001
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,
@@ -24,6 +24,10 @@ app.get('/', (req, res) => {
     res.send({message: 'You have reached the server.'})
 })
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`)
-})
+if(process.env.MODE !== 'production'){
+  app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`)
+  })
+}
+
+export default app
