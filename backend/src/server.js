@@ -7,10 +7,9 @@ import cors from 'cors'
 
 const app = express()
 const PORT = process.env.PORT || 5001
-const MODE = process.env.MODE
 
 app.use(cors({
-  origin: MODE !== 'production' ? 'http://localhost:5173' : FRONTEND_URL,
+  origin: process.env.FRONTEND_URL,
   credentials: true
 }))
 
@@ -25,10 +24,10 @@ app.get('/', (req, res) => {
     res.send({message: 'You have reached the server.'})
 })
 
-if(process.env.MODE !== 'production'){
-  app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`)
-  })
-}
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`)
+})
+
 
 export default app

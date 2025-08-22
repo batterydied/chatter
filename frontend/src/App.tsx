@@ -18,6 +18,7 @@ function App() {
   auth.useDeviceLanguage()
 
   const logIn = async () => {
+      console.log(window.location.origin);
       try{
           const provider = new GoogleAuthProvider()
           const result = await signInWithPopup(auth, provider)
