@@ -1,8 +1,8 @@
 import 'dotenv/config'
 import express from "express"
-import UserRoutes from "./src/routes/userRoutes.js"
-import RelationRoutes from "./src/routes/relationRoutes.js"
-import ConversationRoutes from "./src/routes/conversationRoutes.js"
+import UserRoutes from "../src/routes/userRoutes.js"
+import RelationRoutes from "../src/routes/relationRoutes.js"
+import ConversationRoutes from "../src/routes/conversationRoutes.js"
 import cors from 'cors'
 
 const app = express()
