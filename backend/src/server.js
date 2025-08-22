@@ -9,7 +9,7 @@ const app = express()
 const PORT = process.env.PORT || 5001
 
 app.use(cors({
-  origin: ['https://chatter-swart.vercel.app', 'http://localhost:5173'],
+  origin: ['https://chatter-s3t1.vercel.app', 'http://localhost:5173'],
   credentials: true
 }))
 
