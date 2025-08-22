@@ -1,6 +1,6 @@
 import express from 'express'
 import ConversationController from '../controllers/conversationController.js'
-import MessageRoutes from '../routes/messageRoutes.js'
+import MessageRoutes from './messageRoutes.js'
 
 const router = express.Router()
 
