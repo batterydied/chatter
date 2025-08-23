@@ -6,7 +6,7 @@ import type { AppUser, Conversation, FriendRequest } from './homePageHelpers'
 import NewUserModal from './components/NewUserPage'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
-import { CheckIcon, GearsIcon, UserIcon, XIcon } from '../../assets/icons'
+import { CheckIcon, UserIcon, XIcon } from '../../assets/icons'
 import { collection, DocumentSnapshot, getDoc, onSnapshot, query, where, doc, getDocs, writeBatch, updateDoc, orderBy, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from 'react-virtualized'
@@ -18,6 +18,7 @@ import VList from './components/VList'
 import SettingModal from './components/SettingModal'
 import FriendRequestBtn from './components/FriendRequestBtn'
 import { toDateSafe } from '../../utils/toDateSafe'
+import ProfilePanel from './components/ProfilePanel'
 
 type HomeProps = {
     user: User | null
@@ -362,19 +363,8 @@ const HomePage = ({user, logOut} : HomeProps) => {
                                     </div>
                                     <VList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
                                 </ul>
-                                <div className='flex h-1/6 justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
-                                    <div className='flex flex-row items-center'>
-                                        <div className="avatar avatar-online avatar-placeholder">
-                                            <div className="bg-neutral text-base-content w-16 rounded-full">
-                                                <img src={getPfpByFilePath(appUser!.pfpFilePath)} />
-                                            </div>
-                                        </div>
-                                        <div className='pl-2'>
-                                            <p className='text-sm text-left'>{appUser?.username}</p>
-                                            <p className='text-sm text-neutral-content'>ID: {appUser?.id}</p>
-                                        </div>
-                                    </div>
-                                    <GearsIcon onClick={handleOpenSetting} className='text-gray-400 hover:text-white hover:cursor-pointer hover:animate-spin-slow' size={32}/>
+                                <div className='flex items-end h-1/6 w-full'>
+                                    <ProfilePanel appUser={appUser} handleOpenSetting={handleOpenSetting} />
                                 </div>
                             </div>
                             <div className='ml-2 p-2 w-full bg-base-300'>
