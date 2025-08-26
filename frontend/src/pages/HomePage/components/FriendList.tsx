@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, deleteDoc, updateDoc } from 'firebase/firestore'
@@ -44,7 +44,6 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     const [errorMessage, setErrorMessage] = useState('')
     const [outgoingRequests, setOutgoingRequests] = useState<OutgoingRequest[]>([])
     const [modalOpen, setModalOpen] = useState(false)
-    const [onlineFriends, setOnlineFriends] = useState<Friend[]>([])
     const [isReady, setIsReady] = useState(false)
 
     const cacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
@@ -63,6 +62,9 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         const docRef = doc(db, 'relations', outgoingRequestId)
         await deleteDoc(docRef)
     }
+     const onlineFriends = useMemo(()=>{
+        return friends.filter((friend)=>friend.isOnline)
+     },[friends])
 
     useEffect(()=>{
         const queryRef = query(collection(db, 'relations'), where('to', '==', userId), where('status', '==', 'friend'))
@@ -70,9 +72,6 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             snapshot.docChanges().forEach(async (change) => {
                 if (change.type === 'removed') {
                     setFriends(prev => prev.filter((f)=> {
-                        return f.friendId != change.doc.data().from
-                    }))
-                    setOnlineFriends(prev => prev.filter((f)=> {
                         return f.friendId != change.doc.data().from
                     }))
                     return
@@ -399,7 +398,6 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 if (!snapshot.exists()) {
                     if (idx >= 0) cacheRef.current.clear(idx, 0);
                     setFriends(prev => prev.filter(f => f.friendId !== friend.friendId));
-                    setOnlineFriends(prev => prev.filter(f => f.friendId !== friend.friendId));
                     return;
                 }
 
@@ -416,20 +414,6 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 setFriends(prev =>
                     prev.map(f => (f.friendId === friend.friendId ? updatedFriend : f))
                 );
-
-                // update onlineFriends
-                setOnlineFriends(prev => {
-                    const alreadyOnline = prev.find(f => f.friendId === friend.friendId);
-                    if (updatedFriend.isOnline) {
-                        if (alreadyOnline) {
-                            return prev.map(f => (f.friendId === friend.friendId ? updatedFriend : f));
-                        } else {
-                            return [...prev, updatedFriend];
-                        }
-                    } else {
-                        return prev.filter(f => f.friendId !== friend.friendId);
-                    }
-                });
 
                 if (idx >= 0 && idx < friends.length) {
                     cacheRef.current.clear(idx, 0);
