@@ -11,6 +11,7 @@ import { Toaster } from 'sonner'
 import { ref, serverTimestamp, set } from 'firebase/database';
 import { rtdb } from './config/firebase';
 import useSummaryStatus from './hooks/useSummaryStatus';
+import { AppContext } from './hooks/useAppContext';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -20,14 +21,12 @@ function App() {
   const logIn = async () => {
       try{
           const provider = new GoogleAuthProvider()
-          const result = await signInWithPopup(auth, provider)
-          const user = result.user
-          console.log(user)
+          await signInWithPopup(auth, provider)
       }catch(e){
           if(e instanceof Error){
-              console.log(e.message)
+              console.error(e.message)
           }else{
-              console.log('An error occurred')
+              console.error('An error occurred')
           }
       }
   }
@@ -68,10 +67,12 @@ function App() {
     <>
       <Toaster richColors position="top-right" />
       <BrowserRouter>
-        <Routes>
-          <Route path='/' element={<AuthPage user={user} logIn={logIn}/>} />
-          <Route path='/home' element={<HomePage user={user} logOut={logOut}/>} />
-        </Routes>
+        <AppContext.Provider value={{user, logIn, logOut}}>
+          <Routes>
+            <Route path='/' element={<AuthPage />} />
+            <Route path='/home' element={<HomePage />} />
+          </Routes>
+        </AppContext.Provider>
       </BrowserRouter>
     </>
   )

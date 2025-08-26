@@ -12,9 +12,9 @@ import OutgoingRequestModal from "./OutgoingRequestModal"
 import AddFriendModal from "./AddFriendModal"
 import serializeFriends from "../../../utils/serializeFriends"
 import RemoveFriendConfirmationModal from "./RemoveFriendConfirmationModal"
+import { useHomePageContext } from "../../../hooks/useHomePageContext"
 
 type FriendListProps = {
-    userId: string,
     setSelectedConversation: (conversation: Conversation) => void
 }
 
@@ -33,7 +33,8 @@ type OutgoingRequest = {
     pfpFilePath: string
 }
 
-const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
+const FriendList = ({setSelectedConversation}: FriendListProps) => {
+    const user = useHomePageContext()
     const [friends, setFriends] = useState<Friend[]>([])
     const [selectedOnline, setSelectedOnline] = useState<boolean>(true)
     const onlineFriendRef = useRef<HTMLButtonElement>(null)
@@ -67,7 +68,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
      },[friends])
 
     useEffect(()=>{
-        const queryRef = query(collection(db, 'relations'), where('to', '==', userId), where('status', '==', 'friend'))
+        const queryRef = query(collection(db, 'relations'), where('to', '==', user.id), where('status', '==', 'friend'))
         const unsub = onSnapshot(queryRef, (snapshot) => {
             snapshot.docChanges().forEach(async (change) => {
                 if (change.type === 'removed') {
@@ -99,7 +100,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
         setIsReady(true)
         return unsub
-    }, [userId])
+    }, [user.id])
 
     const handleRemoveConfirmation = (friend: Friend) => {
         setRemoveFriend(friend);
@@ -151,7 +152,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     }
     
     const validateRequest = useCallback(async () => {
-        if(searchId == userId){
+        if(searchId == user.id){
             setErrorMessage("You can't add yourself.")
             return false
         }
@@ -164,8 +165,8 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         const queryRef = query(
             collection(db, 'relations'), 
             or(
-                and(where("to", "==", searchId), where("from", "==", userId)),
-                and(where("to", "==", userId), where("from", "==", searchId))
+                and(where("to", "==", searchId), where("from", "==", user.id)),
+                and(where("to", "==", user.id), where("from", "==", searchId))
             )
         )
         const snapshot = await getDocs(queryRef)
@@ -188,12 +189,12 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
 
         setSuccessRequestMessage(false)
         return false
-    }, [searchId, userId])
+    }, [searchId, user.id])
 
     const sendRequest = useCallback(async () => {
         try{
             await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/relation/friend-request`, {
-                from: userId,
+                from: user.id,
                 to: searchId
             })
             setErrorMessage('')
@@ -202,7 +203,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         }catch{
             toast.error('Could not send friend request, check the user ID.')
         }
-    }, [searchId, userId])
+    }, [searchId, user.id])
 
     const handleSend = useCallback(async () => {
         if(await validateRequest()){
@@ -225,7 +226,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         try{
             await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/relation/delete-friend`, {
                 data: {
-                    from: userId,
+                    from: user.id,
                     to: friendId
                 }
             })
@@ -237,7 +238,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
         }catch{
             toast.error('Could not remove friend, try again later.')
         }
-    }, [friends, userId])
+    }, [friends, user.id])
 
     const openConversation = useCallback(async (userId1: string, userId2: string, isOnline: boolean) => {
         const queryRef = query(collection(db, 'conversations'), where('directConversationId', '==', [userId1, userId2].sort().join('_')))
@@ -253,7 +254,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 const data = res.data.data
                 const conversation = {
                     id: data.conversationId,
-                    name: await serializeName(data.name, data.participants, userId),
+                    name: await serializeName(data.name, data.participants, user.id),
                     hiddenBy: data.hiddenBy,
                     participants: data.participants,
                     pfpFilePath: data.pfpFilePath,
@@ -266,14 +267,14 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 const data = selectedDoc.data()
                 setSelectedConversation({
                     id: selectedDoc.id,
-                    name: await serializeName(data.name, data.participants, userId),
+                    name: await serializeName(data.name, data.participants, user.id),
                     hiddenBy: data.hiddenBy,
                     participants: data.participants,
                     pfpFilePath: data.pfpFilePath,
                     directConversationId: data.directConversationId,
                     isOnline
                 })
-                await updateDoc(selectedDoc.ref, {hiddenBy: selectedDoc.data().hiddenBy.filter((id: string) => id !== userId)})
+                await updateDoc(selectedDoc.ref, {hiddenBy: selectedDoc.data().hiddenBy.filter((id: string) => id !== user.id)})
             }
         }catch(e){
             if(axios.isAxiosError(e)){
@@ -283,7 +284,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 console.error(e)
             }
         }
-    }, [setSelectedConversation, userId])
+    }, [setSelectedConversation, user.id])
 
     const renderFriends: ListRowRenderer = useCallback(({ index, key, parent, style }) => {
         let friend: Friend
@@ -302,7 +303,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             >
                 {()=>
                 <div style={style} className='relative'>
-                    <div onClick={async ()=> await openConversation(friend.friendId, userId, friend.isOnline)} className='group rounded-none list-row cursor-pointer hover:bg-neutral hover:rounded-xl flex justify-start items-center overflow-hidden'>
+                    <div onClick={async ()=> await openConversation(friend.friendId, user.id, friend.isOnline)} className='group rounded-none list-row cursor-pointer hover:bg-neutral hover:rounded-xl flex justify-start items-center overflow-hidden'>
                         <div className={`avatar ${friend.isOnline ? 'avatar-online' : 'avatar-offline'}`}>
                             <div className="w-10 rounded-full">
                                 <img src={getPfpByFilePath(friend.pfpFilePath)} />
@@ -320,7 +321,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
                 }
             </CellMeasurer>
         )
-    }, [friends, onlineFriends, openConversation, selectedOnline, userId])
+    }, [friends, onlineFriends, openConversation, selectedOnline, user.id])
 
     const serializeRequest = async (docs: DocumentSnapshot[]) => {
         const unfiltered = await Promise.all(docs.map(async (d)=>{
@@ -343,12 +344,12 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
     }
 
     useEffect(()=>{
-        const queryRef = query(collection(db, 'relations'), where('from', '==', userId), where('status', '==', 'pending'))
+        const queryRef = query(collection(db, 'relations'), where('from', '==', user.id), where('status', '==', 'pending'))
         const unsub = onSnapshot(queryRef, async (snapshot)=>{
             setOutgoingRequests(await serializeRequest(snapshot.docs))
         })
         return unsub
-    }, [userId])
+    }, [user.id])
 
     useEffect(()=>{
         if(!modalOpen) return
@@ -432,7 +433,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             friendDict.current[key]()
         }
         friendDict.current = {}
-    }, [userId])
+    }, [user.id])
 
     if(!isReady) return <Loading />
     return (
@@ -447,7 +448,7 @@ const FriendList = ({userId, setSelectedConversation}: FriendListProps) => {
             </div>
             <VList cacheRef={cacheRef} listRef={listRef} renderer={renderFriends} data={selectedOnline ? onlineFriends : friends}/>
             <RemoveFriendConfirmationModal removeFriend={removeFriend} setRemoveFriend={setRemoveFriend} sendRemove={sendRemove} />
-            <AddFriendModal handleSend={handleSend} searchId={searchId} setSearchId={setSearchId} userId={userId} handleCloseRequest={handleCloseRequest} errorMessage={errorMessage} successRequestMessage={successRequestMessage}/>
+            <AddFriendModal handleSend={handleSend} searchId={searchId} setSearchId={setSearchId} handleCloseRequest={handleCloseRequest} errorMessage={errorMessage} successRequestMessage={successRequestMessage}/>
             <OutgoingRequestModal cacheRef={cacheRef} listRef={listRef} renderer={renderRequests} data={outgoingRequests} setModalOpen={setModalOpen}/>
         </div>
     )

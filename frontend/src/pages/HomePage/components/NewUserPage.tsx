@@ -24,7 +24,7 @@ const NewUserModal = ({user, setIsNewUser, email, setAppUser}: NewUserModalProps
     }
 
     return (
-        <div>
+        <>
             <fieldset className="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
                 <legend className="fieldset-legend">Create Your Account</legend>
 
@@ -33,7 +33,7 @@ const NewUserModal = ({user, setIsNewUser, email, setAppUser}: NewUserModalProps
 
                 <button className="btn btn-neutral mt-4" onClick={handleSubmit}>Create</button>
             </fieldset>
-        </div>
+        </>
     )
 }
 

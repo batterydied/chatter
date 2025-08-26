@@ -1,6 +1,5 @@
-import type { User } from 'firebase/auth'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchUserFromDB, getPfpByFilePath } from './homePageHelpers'
 import type { AppUser, Conversation, FriendRequest } from './homePageHelpers'
 import NewUserModal from './components/NewUserPage'
@@ -19,17 +18,15 @@ import SettingModal from './components/SettingModal'
 import FriendRequestBtn from './components/FriendRequestBtn'
 import { toDateSafe } from '../../utils/toDateSafe'
 import ProfilePanel from './components/ProfilePanel'
+import { HomePageContext } from '../../hooks/useHomePageContext'
+import { useAppContext } from '../../hooks/useAppContext'
 
-type HomeProps = {
-    user: User | null
-    logOut: () => void,
-}
 
-const HomePage = ({user, logOut} : HomeProps) => {
+const HomePage = () => {
+    const {user, logOut} = useAppContext()
     const [isNewUser, setIsNewUser] = useState<boolean | null>(null)
     const [appUser, setAppUser] = useState<AppUser | null>(null)
     const [recentConversations, setRecentConversations] = useState<Conversation[]>([])
-    const [visibleConversations, setVisibleConversations] = useState<Conversation[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
@@ -44,10 +41,11 @@ const HomePage = ({user, logOut} : HomeProps) => {
 
     const navigate = useNavigate();
 
-    useEffect(()=>{
-        setVisibleConversations(recentConversations.filter((c)=>!c.hiddenBy.includes(appUser?.id || '')))
+    const visibleConversations = useMemo(()=>{
+        if(!appUser) return []
+        return recentConversations.filter((c)=>!c.hiddenBy.includes(appUser.id))
     }, [recentConversations, appUser])
-
+    
     useEffect(()=>{
         if(!user) {
             navigate("/", { replace: true });
@@ -345,39 +343,41 @@ const HomePage = ({user, logOut} : HomeProps) => {
                 isNewUser ? (
                     <NewUserModal setIsNewUser={setIsNewUser} email={user.email} setAppUser={setAppUser} user={user}/>
                 ) : (appUser &&
-                        <div className='flex flex-row w-full h-full'>
-                            <div className='min-w-[360px]'>
-                                <ul className='list h-5/6 overflow-y-auto overflow-x-hidden'>
-                                    <li>
-                                        <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 text-gray-400 hover:text-white' onClick={handleClearSelectConversation}>
-                                            <UserIcon className='text-gray-400 group-hover:text-white' />
-                                            Friends
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <FriendRequestBtn onClick={handleOpenRequest} count={modalOpen ? 0 : unreadRequest} />
-                                    </li>
-                                    <div className='border-b border-gray-700 pb-2' />
-                                    <div className='my-1 flex justify-start text-gray-600 text-sm'>
-                                        Direct Messages
+                        <HomePageContext.Provider value={appUser}>
+                            <div className='flex flex-row w-full h-full'>
+                                <div className='min-w-[360px]'>
+                                    <ul className='list h-5/6 overflow-y-auto overflow-x-hidden'>
+                                        <li>
+                                            <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 text-gray-400 hover:text-white' onClick={handleClearSelectConversation}>
+                                                <UserIcon className='text-gray-400 group-hover:text-white' />
+                                                Friends
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <FriendRequestBtn onClick={handleOpenRequest} count={modalOpen ? 0 : unreadRequest} />
+                                        </li>
+                                        <div className='border-b border-gray-700 pb-2' />
+                                        <div className='my-1 flex justify-start text-gray-600 text-sm'>
+                                            Direct Messages
+                                        </div>
+                                        <VList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
+                                    </ul>
+                                    <div className='flex items-end h-1/6 w-full'>
+                                        <ProfilePanel appUser={appUser} handleOpenSetting={handleOpenSetting} />
                                     </div>
-                                    <VList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
-                                </ul>
-                                <div className='flex items-end h-1/6 w-full'>
-                                    <ProfilePanel appUser={appUser} handleOpenSetting={handleOpenSetting} />
                                 </div>
-                            </div>
-                            <div className='ml-2 p-2 w-full bg-base-300'>
-                                {selectedConversation ? 
-                                <ConversationWindow conversation={selectedConversation} userId={appUser!.id} />
-                                : 
-                                <FriendList userId={appUser!.id} setSelectedConversation={setSelectedConversation}/>
-                                }
-                            </div>
-                            <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} onClose={handleCloseRequestModal} handleDeclineAll={handleDeclineAll}/>
+                                <div className='ml-2 p-2 w-full bg-base-300'>
+                                    {selectedConversation ? 
+                                    <ConversationWindow conversation={selectedConversation} />
+                                    : 
+                                    <FriendList setSelectedConversation={setSelectedConversation}/>
+                                    }
+                                </div>
+                                <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} onClose={handleCloseRequestModal} handleDeclineAll={handleDeclineAll}/>
 
-                            <SettingModal user={appUser} logOut={logOut}/>
-                        </div>
+                                <SettingModal logOut={logOut}/>
+                            </div>
+                        </HomePageContext.Provider>
                     )
                 ) : (
                 <Navigate to='/' />

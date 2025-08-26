@@ -1,13 +1,9 @@
 import { Navigate } from 'react-router-dom'
-import type { User } from 'firebase/auth'
+import { useAppContext } from '../../hooks/useAppContext'
 
-type AuthProps = {
-    user: User | null,
-    logIn: ()=>void
-}
 
-const AuthPage = ({user, logIn} : AuthProps) => {
-    
+const AuthPage = () => {
+    const {user, logIn} = useAppContext()
     return (
         <>
             <div>

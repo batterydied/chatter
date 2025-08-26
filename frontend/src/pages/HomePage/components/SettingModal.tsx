@@ -1,21 +1,22 @@
 import { useRef, useState } from "react"
 import { CameraIcon, EditIcon, LogOutIcon } from "../../../assets/icons"
-import { getPfpByFilePath, type AppUser } from "../homePageHelpers"
+import { getPfpByFilePath } from "../homePageHelpers"
 import truncateName from "../../../utils/truncateName"
 import { doc, updateDoc } from "firebase/firestore"
 import { db } from "../../../config/firebase"
 import { toast } from "sonner"
 import AvatarEditorModal from "./AvatarEditorModal"
 import { supabase } from "../../../config/supabase"
+import { useHomePageContext } from "../../../hooks/useHomePageContext"
 
 
 type SettingModalProps = {
     logOut: () => void,
-    user: AppUser
 }
 
 
-const SettingModal = ({logOut, user}: SettingModalProps) => {
+const SettingModal = ({logOut}: SettingModalProps) => {
+    const user = useHomePageContext()
     const [username, setUsername] = useState(user.username)
     const [previewUrl, setPreviewUrl] = useState('')
     const [scale, setScale] = useState(1)

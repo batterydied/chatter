@@ -18,10 +18,10 @@ import VList from './VList'
 import serializeMessages from '../../../utils/serializeMessages'
 import ConversationHeader from './ConversationHeader'
 import formatMessageTime from '../../../utils/formatMessageTime'
+import { useHomePageContext } from '../../../hooks/useHomePageContext'
 
 type ConversationWindowProps = {
   conversation: Conversation,
-  userId: string,
 }
 
 export type RawMessage = {
@@ -52,7 +52,8 @@ export type SerializedMessage = {
     emoji: string,
   }[],
 }
-const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) => {
+const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
+  const user = useHomePageContext()
   const [messages, setMessages] = useState<SerializedMessage[]>([])
   const [loadingMessages, setLoadingMessages] = useState(true)
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
@@ -139,7 +140,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     return () => {
       unsubscribers.forEach(unsub => unsub())
     }
-  }, [conversation, userId])
+  }, [conversation, user.id])
 
   useEffect(()=>{
     for (const key in subscriptionDict.current) {
@@ -160,7 +161,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
   
   const handleSubmit = () => {
     if(newMessage){
-      uploadMessage(conversation.id, userId, newMessage, replyMessage != null, replyMessage?.id || '')
+      uploadMessage(conversation.id, user.id, newMessage, replyMessage != null, replyMessage?.id || '')
       setNewMessage('')
     }
     if (textareaRef.current) {
@@ -279,7 +280,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     let updatedReactions: Reaction[] = []
     const updatedMessages = messages.map((m)=>{
       if(m.id == msgId){
-        updatedReactions = [...m.reactions, {user: userId, emoji }]
+        updatedReactions = [...m.reactions, {user: user.id, emoji }]
         return {...m, reactions: updatedReactions}
       }
       return m
@@ -296,7 +297,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     let updatedReactions: Reaction[] = []
     const updatedMessages = messages.map((m)=>{
       if(m.id == msgId){
-        updatedReactions = [...m.reactions.filter((x)=> x.emoji != emoji || x.user != userId)]
+        updatedReactions = [...m.reactions.filter((x)=> x.emoji != emoji || x.user != user.id)]
         return {...m, reactions: updatedReactions}
       }
       return m
@@ -385,7 +386,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       prev.senderId === msg.senderId &&
       Math.abs(msg.createdAt.getTime() - prev.createdAt.getTime()) < 2 * 60 * 1000
     const isHovered = hoveredMessageId === msg.id
-    const isUser = userId === msg.senderId
+    const isUser = user.id === msg.senderId
     const isEditingMessage = editMessage?.id === msg.id
     const isReply = replyMessage?.id === msg.id
     const repliedMessageId = msg.replyId
@@ -484,7 +485,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
                   <Reactions
                     msgId={msg.id}
                     reactions={msg.reactions}
-                    appUserId={userId}
+                    appUserId={user.id}
                     handleIncrement={handleIncrement}
                     handleDecrement={handleDecrement}
                   />
@@ -507,11 +508,11 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
                       setSelectedMessageId(msg.id)
                     }
                   } className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
-                  {userId == msg.senderId && (
+                  {user.id == msg.senderId && (
                       <EditIcon onClick={() => handleEdit(msg, index)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
                   )}
                   <ReplyIcon onClick={() => handleReply(msg)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
-                  {userId == msg.senderId && (
+                  {user.id == msg.senderId && (
                       <DeleteIcon onClick={() => handleDeleteConfirmation(msg)} className="text-red-800 hover:text-red-600 hover:cursor-pointer mx-1" />
                   )}
                 </div>
@@ -605,7 +606,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
       });
     });
 
-  }, [conversation, messages, userId]);
+  }, [conversation, messages, user.id]);
 
   useEffect(()=>{
     if(!shouldOpenPicker) return
@@ -655,7 +656,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
         const exists = prev.some((m) => m.id === newMessage.id);
         if (exists) return prev;
 
-        if (newMessage.senderId === userId || isNearBottom) {
+        if (newMessage.senderId === user.id || isNearBottom) {
           setShouldScrollToBottom(true);
         }
         idx = prev.length;
@@ -668,7 +669,7 @@ const ConversationWindow = ({ conversation, userId }: ConversationWindowProps) =
     });
     
     return unsub;
-  }, [conversation, userId, isNearBottom]);
+  }, [conversation, user.id, isNearBottom]);
 
   const handlePicker = () => {
     setShouldOpenPicker(prev => !prev)
