@@ -7,14 +7,14 @@ import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon } from '../../../asse
 import { toast } from 'sonner'
 import { CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
-import { getPfpByFilePath, type Conversation } from '../homePageHelpers'
+import { type Conversation } from '../homePageHelpers'
 import EmojiPicker from 'emoji-picker-react'
 import { Theme } from 'emoji-picker-react'
 import { supabase } from '../../../config/supabase'
 import Loading from './Loading'
 import DeleteMessageModal from './DeleteMessageModal'
 import { Reactions, type Reaction } from './Reactions'
-import VList from './VList'
+import VList from './DynamicVList'
 import serializeMessages from '../../../utils/serializeMessages'
 import ConversationHeader from './ConversationHeader'
 import formatMessageTime from '../../../utils/formatMessageTime'
@@ -714,7 +714,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                 </div>
             </div>
         }
-        <ConversationHeader src={getPfpByFilePath(conversation.pfpFilePath)} name={conversation.name} isDirect={conversation.directConversationId != ''} isOnline={conversation.isOnline} />
+        <ConversationHeader conversation={conversation} />
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
         <div className='w-full h-screen relative'>
           <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} data={messages} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length: undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>

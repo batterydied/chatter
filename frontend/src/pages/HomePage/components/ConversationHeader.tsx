@@ -1,19 +1,19 @@
+import { type Conversation } from "../homePageHelpers"
+import { getPfpByFilePath } from "../../../utils/getPfp"
+
 type ConversationHeaderProps = {
-    isDirect: boolean,
-    isOnline: boolean,
-    name: string,
-    src: string
+    conversation : Conversation
 }
-const ConversationHeader = ({isDirect, src, name, isOnline}: ConversationHeaderProps) => {
+const ConversationHeader = ({conversation}: ConversationHeaderProps) => {
     return (
         <div className='border-b-1 border-gray-700 flex justify-start items-center p-2'>
             <div className={`avatar 
-            ${isDirect && (isOnline ? 'avatar-online' : 'avatar-offline')}`}>
+            ${conversation.directConversationId && (conversation.isOnline ? 'avatar-online' : 'avatar-offline')}`}>
             <div className="w-6 rounded-full">
-                <img src={src} />
+                <img src={getPfpByFilePath(conversation.pfpFilePath)} />
             </div>
             </div>
-            <div className='ml-2 text-white'>{name}</div>
+            <div className='ml-2 text-white'>{conversation.name}</div>
         </div>
     )
 

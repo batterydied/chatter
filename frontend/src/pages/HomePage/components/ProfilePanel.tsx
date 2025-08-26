@@ -1,5 +1,6 @@
 import { GearsIcon } from "../../../assets/icons"
-import { getPfpByFilePath, type AppUser } from "../homePageHelpers"
+import { type AppUser } from "../homePageHelpers"
+import { getPfpByFilePath } from "../../../utils/getPfp"
 
 type ProfilePanelProps = {
     appUser: AppUser | null,

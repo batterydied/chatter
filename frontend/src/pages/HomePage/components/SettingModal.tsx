@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import { CameraIcon, EditIcon, LogOutIcon } from "../../../assets/icons"
-import { getPfpByFilePath } from "../homePageHelpers"
+import { getPfpByFilePath } from "../../../utils/getPfp"
 import truncateName from "../../../utils/truncateName"
 import { doc, updateDoc } from "firebase/firestore"
 import { db } from "../../../config/firebase"

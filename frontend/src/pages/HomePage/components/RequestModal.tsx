@@ -1,7 +1,7 @@
-import VList from "./VList"
-import type { ModalBaseProps } from "../../../utils/ModalBaseProps"
+import VList from "./DynamicVList"
+import type { DynamicModalBaseProps } from "../../../utils/ModalBaseProps"
 
-type RequestModalProps = ModalBaseProps & {
+type RequestModalProps = DynamicModalBaseProps & {
     onClose: () => void,
     handleDeclineAll: () => Promise<void>
 }

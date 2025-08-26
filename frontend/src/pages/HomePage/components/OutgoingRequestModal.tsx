@@ -1,7 +1,7 @@
 import { AutoSizer, List} from "react-virtualized"
-import type { ModalBaseProps } from "../../../utils/ModalBaseProps"
+import type { DynamicModalBaseProps } from "../../../utils/ModalBaseProps"
 
-type OutgoingRequestModalProps = ModalBaseProps & {
+type OutgoingRequestModalProps = DynamicModalBaseProps & {
     setModalOpen: (open: boolean) => void
 }
 

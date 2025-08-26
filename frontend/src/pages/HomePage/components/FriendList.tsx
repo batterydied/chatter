@@ -5,14 +5,15 @@ import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, Do
 import { CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
 import { RemoveUserIcon } from "../../../assets/icons"
 import { toast } from "sonner"
-import { getPfpByFilePath, serializeName, type Conversation } from "../homePageHelpers"
+import { serializeName, type Conversation } from "../homePageHelpers"
 import Loading from "./Loading"
-import VList from "./VList"
+import VList from "./DynamicVList"
 import OutgoingRequestModal from "./OutgoingRequestModal"
 import AddFriendModal from "./AddFriendModal"
 import serializeFriends from "../../../utils/serializeFriends"
 import RemoveFriendConfirmationModal from "./RemoveFriendConfirmationModal"
 import { useHomePageContext } from "../../../hooks/useHomePageContext"
+import { getPfpByFilePath } from "../../../utils/getPfp"
 
 type FriendListProps = {
     setSelectedConversation: (conversation: Conversation) => void

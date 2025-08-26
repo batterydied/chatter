@@ -1,6 +1,6 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchUserFromDB, getPfpByFilePath } from './homePageHelpers'
+import { fetchUserFromDB } from './homePageHelpers'
 import type { AppUser, Conversation, FriendRequest } from './homePageHelpers'
 import NewUserModal from './components/NewUserPage'
 import FriendList from './components/FriendList'
@@ -13,14 +13,14 @@ import axios from 'axios'
 import { toast } from 'sonner'
 import Loading from './components/Loading'
 import RequestModal from './components/RequestModal'
-import VList from './components/VList'
+import DynamicVList from './components/DynamicVList.tsx'
 import SettingModal from './components/SettingModal'
 import FriendRequestBtn from './components/FriendRequestBtn'
 import { toDateSafe } from '../../utils/toDateSafe'
 import ProfilePanel from './components/ProfilePanel'
 import { HomePageContext } from '../../hooks/useHomePageContext'
 import { useAppContext } from '../../hooks/useAppContext'
-
+import { getPfpByFilePath } from '../../utils/getPfp'
 
 const HomePage = () => {
     const {user, logOut} = useAppContext()
@@ -34,10 +34,13 @@ const HomePage = () => {
     const [unreadRequest, setUnreadRequest] = useState(0)
     const requestCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const requestListRef = useRef<List>(null)
-    const directConversationRecordRef = useRef<Record<string, ()=>void>>({})
+    const [displayInfoRecord, setDisplayInfoRecord] = useState<Record<string, {displayName: string, displayPfpFilePath: string, displayIsOnline: boolean}>>({})
+
 
     const conversationCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const conversationListRef = useRef<List>(null)
+
+    const unSubscriptionRef = useRef<(()=>void)[]>([])
 
     const navigate = useNavigate();
 
@@ -51,6 +54,9 @@ const HomePage = () => {
             navigate("/", { replace: true });
             return;
         }
+        for(const unsub of unSubscriptionRef.current) unsub()
+        unSubscriptionRef.current = []
+
         if(user.email){
             fetchUserFromDB(user.email, setIsNewUser, setAppUser, setLoading)
         }
@@ -75,6 +81,40 @@ const HomePage = () => {
         , 0)
         setUnreadRequest(count)
     }, [appUser, friendRequests])
+
+    useEffect(()=>{
+        if(!appUser?.id) return 
+        for(const conversation of recentConversations){
+            if(displayInfoRecord[conversation.id]) continue
+            if(conversation.directConversationId){
+                const recipientId = conversation.participants.filter((p) => p != appUser.id)[0]
+                const userRef = doc(db, 'users', recipientId)
+                
+                const unsub = onSnapshot(userRef, (snapshot) => {
+                    let displayInfo = {
+                        displayName: 'Deleted User',
+                        displayPfpFilePath: '',
+                        displayIsOnline: false
+                    }
+                    if(snapshot.exists()){
+                        const data = snapshot.data()
+                         displayInfo = {
+                            displayName: data.username,
+                            displayPfpFilePath: data.pfpFilePath,
+                            displayIsOnline: data.isOnline
+                        }
+                    }
+                    setDisplayInfoRecord(prev => ({...prev, [conversation.id]: displayInfo}))
+                    conversationCacheRef.current.clearAll()
+                    conversationListRef.current?.recomputeRowHeights()
+                })
+
+                unSubscriptionRef.current.push(unsub)
+
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [recentConversations, appUser?.id])
 
     const handleSetFriendRequests = useCallback(async (docs: DocumentSnapshot[]) => {
         const results = await Promise.all(
@@ -132,12 +172,6 @@ const HomePage = () => {
     }, [appUser, handleSetFriendRequests])
 
     useEffect(() => {
-        for(const unsub of Object.values(directConversationRecordRef.current)) unsub()
-
-        directConversationRecordRef.current = {}
-    }, [appUser])
-
-    useEffect(() => {
         if (!modalOpen || !appUser) return;
 
         const queryRef = query(
@@ -160,44 +194,26 @@ const HomePage = () => {
             orderBy('lastMessageTime', 'desc')
         );
 
-        const unsubConversations = onSnapshot(convQuery, async (snapshot) => {
-            const conversations: Conversation[] = await Promise.all(
-            snapshot.docs.map(async (snapshotDoc) => {
-                const data = snapshotDoc.data()
-                const template: Conversation = {
-                id: snapshotDoc.id,
-                pfpFilePath: data.pfpFilePath,
-                name: data.name,
-                isOnline: false,
-                directConversationId: data.directConversationId,
-                hiddenBy: data.hiddenBy,
-                participants: data.participants,
-                };
-
-                if (data.directConversationId) {
-                const otherUserId = template.participants.find((p) => p !== appUser.id)!
-                const userSnapshot = await getDoc(doc(db, 'users', otherUserId))
-                if (userSnapshot.exists()) {
-                    const userData = userSnapshot.data()
-                    template.isOnline = userData.isOnline
-                    template.name = userData.username
-                    template.pfpFilePath = userData.pfpFilePath
-                } else {
-                    template.name = 'Deleted User'
-                    template.pfpFilePath = ''
+        const unsub = onSnapshot(convQuery, (snapshot)=>{
+            const conversations: Conversation[] = []
+            for(const doc of snapshot.docs){
+                const data = doc.data()
+                const conversationTemplate = {
+                    id: doc.id,
+                    name: data.name,
+                    hiddenBy: data.hiddenBy,
+                    participants: data.participants,
+                    pfpFilePath: data.pfpFilePath,
+                    directConversationId: data.directConversationId,
+                    isOnline: false
                 }
-                }
-                return template
-            })
-            );
-
+                conversations.push(conversationTemplate)
+            }
             setRecentConversations(conversations)
             setLoading(false)
-        });
+        })
 
-        return () => {
-            unsubConversations()
-        }
+        return unsub
         }, [appUser]);
 
     const handleDeclineAll = useCallback(async () => {
@@ -233,44 +249,58 @@ const HomePage = () => {
         setModalOpen(false)
     }, [appUser])
 
-    const renderConversations: ListRowRenderer = useCallback(({index, key, parent, style }) => {
-        const conversation = visibleConversations[index]
-        const highlightConversation = selectedConversation?.id == conversation.id
+    const renderConversations: ListRowRenderer = useCallback(
+    ({ index, key, parent, style }) => {
+        const conversation = visibleConversations[index];
+        const displayInfo = displayInfoRecord[conversation.id] || null;
+        const highlightConversation = selectedConversation?.id === conversation.id;
+
         return (
-            <CellMeasurer
-             key={key}
-             cache={conversationCacheRef.current}
-             parent={parent}
-             columnIndex={0}
-             rowIndex={index}>
-                {()=>{
-                    return (
-                        <div style={style}>
-                            <li className={`list-row no-list-divider cursor-pointer transition-colors hover:bg-neutral 
-                                flex justify-between items-center group
-                                ${highlightConversation ? 'bg-base-300' : ''}`}
-                            onClick={()=>{
-                                setSelectedConversation(conversation)
-                            }} 
-                            >
-                                <div className='flex items-center'>
-                                    <div className={`avatar 
-                                        ${conversation.directConversationId && (conversation.isOnline ? 'avatar-online' : 'avatar-offline')} 
-                                    mr-2`}>
-                                        <div className="w-10 rounded-full">
-                                            <img src={getPfpByFilePath(conversation.pfpFilePath)} />
-                                        </div>
-                                    </div>
-                                    <div>{conversation.name}</div>
-                                </div>
-                                <XIcon onClick={(e)=>handleHideConversation(e, conversation)} className='hidden group-hover:block rounded-full hover:outline-1 hover:outline-accent text-gray-400 hover:text-white'/>
-                            </li>
-                        </div>
-                    )
-                }}
-            </CellMeasurer>
-        )
-    }, [handleHideConversation, selectedConversation?.id, visibleConversations])
+        <CellMeasurer
+            key={key}
+            cache={conversationCacheRef.current}
+            parent={parent}
+            columnIndex={0}
+            rowIndex={index}
+        >
+            {() => (
+            <div style={style}>
+                <li
+                className={`list-row no-list-divider cursor-pointer transition-colors hover:bg-neutral 
+                    flex justify-between items-center group
+                    ${highlightConversation ? 'bg-base-300' : ''}`}
+                onClick={() => setSelectedConversation(conversation)}
+                >
+                <div className="flex items-center">
+                    <div
+                    className={`avatar ${
+                        displayInfo && (displayInfo.displayIsOnline ? 'avatar-online' : 'avatar-offline')
+                    } mr-2`}
+                    >
+                    <div className="w-10 rounded-full">
+                        <img
+                        src={getPfpByFilePath(
+                            displayInfo ? displayInfo.displayPfpFilePath : conversation.pfpFilePath
+                        )}
+                        alt="avatar"
+                        />
+                    </div>
+                    </div>
+                    <div>{displayInfo ? displayInfo.displayName : conversation.name}</div>
+                </div>
+                <XIcon
+                    onClick={(e) => handleHideConversation(e, conversation)}
+                    className="hidden group-hover:block rounded-full hover:outline-1 hover:outline-accent text-gray-400 hover:text-white"
+                />
+                </li>
+            </div>
+            )}
+        </CellMeasurer>
+        );
+    },
+    [displayInfoRecord, handleHideConversation, selectedConversation?.id, visibleConversations]
+    );
+
     const renderRequests: ListRowRenderer= useCallback(({ index, key, parent, style }) => {
         const request = friendRequests[index]
         return (
@@ -360,7 +390,7 @@ const HomePage = () => {
                                         <div className='my-1 flex justify-start text-gray-600 text-sm'>
                                             Direct Messages
                                         </div>
-                                        <VList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
+                                        <DynamicVList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
                                     </ul>
                                     <div className='flex items-end h-1/6 w-full'>
                                         <ProfilePanel appUser={appUser} handleOpenSetting={handleOpenSetting} />
