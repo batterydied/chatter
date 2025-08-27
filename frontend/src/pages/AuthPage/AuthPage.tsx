@@ -37,15 +37,10 @@ const AuthPage = () => {
         </button>
       </div>
 
-      {/* Spline / fallback */}
       <div className="w-full h-full">
-        {canUseWebGL ? (
+        {canUseWebGL && 
           <Spline scene="https://prod.spline.design/5DvbVl2fOfUp5M5R/scene.splinecode" />
-        ) : (
-          <div className="w-full h-full bg-gray-900 flex justify-center items-center text-white">
-            3D background not supported
-          </div>
-        )}
+        }
       </div>
     </div>
   );
