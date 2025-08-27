@@ -1,22 +1,20 @@
 import { Navigate } from 'react-router-dom';
 import { useAppContext } from '../../hooks/useAppContext';
 import Spline from '@splinetool/react-spline';
-
-const isWebGLAvailable = (): boolean => {
-  try {
-    const canvas = document.createElement('canvas');
-    return !!(
-      window.WebGLRenderingContext &&
-      (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
-    );
-  } catch {
-    return false;
-  }
-};
+import type { JSX } from 'react';
 
 const AuthPage = () => {
   const { user, logIn } = useAppContext();
-  const canUseWebGL = isWebGLAvailable()
+  let splineScene: JSX.Element | null = null;
+
+  try {
+    splineScene = (
+      <Spline scene="https://prod.spline.design/5DvbVl2fOfUp5M5R/scene.splinecode" />
+    );
+  } catch (e) {
+    console.error('Spline failed to load:', e);
+    splineScene = null;
+  }
 
   if (user) return <Navigate to="/home" />;
 
@@ -30,9 +28,7 @@ const AuthPage = () => {
       </div>
 
       <div className="w-full h-full">
-        {canUseWebGL && 
-          <Spline scene="https://prod.spline.design/5DvbVl2fOfUp5M5R/scene.splinecode" />
-        }
+        {splineScene}
       </div>
     </div>
   );
