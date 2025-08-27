@@ -1,20 +1,10 @@
 import { Navigate } from 'react-router-dom';
 import { useAppContext } from '../../hooks/useAppContext';
 import Spline from '@splinetool/react-spline';
-import type { JSX } from 'react';
+import ErrorBoundary from '../HomePage/components/ErrorBoundary';
 
 const AuthPage = () => {
   const { user, logIn } = useAppContext();
-  let splineScene: JSX.Element | null = null;
-
-  try {
-    splineScene = (
-      <Spline scene="https://prod.spline.design/5DvbVl2fOfUp5M5R/scene.splinecode" />
-    );
-  } catch (e) {
-    console.error('Spline failed to load:', e);
-    splineScene = null;
-  }
 
   if (user) return <Navigate to="/home" />;
 
@@ -28,7 +18,9 @@ const AuthPage = () => {
       </div>
 
       <div className="w-full h-full">
-        {splineScene}
+        <ErrorBoundary>
+           <Spline scene="https://prod.spline.design/5DvbVl2fOfUp5M5R/scene.splinecode" />
+        </ErrorBoundary>
       </div>
     </div>
   );
