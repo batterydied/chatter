@@ -4,12 +4,28 @@
   themes: dark;
 }
 
-@utility animate-spin-slow {
-  animation: spin 3s linear infinite;
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@layer utilities{
+  .animate-spin-slow {
+    animation: spin 3s linear infinite;
+  }
+  .animate-fade-in{
+    animation: fadeIn 3s ease-out forwards;
+  }
 }
 
 html, body{
   height: 100%;
   width: 100%;
   font-family: system-ui, Helvetica, Arial, sans-serif;
+}
+
+#root{
+  padding: 0 !important;
+  height: 100%;
+  width: 100%;
 }

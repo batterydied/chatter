@@ -369,7 +369,7 @@ const HomePage = () => {
     if(loading) return <Loading />
 
     return (
-        <div className='w-full h-full flex justify-center items-center'>
+        <div className='p-2 w-full h-full flex justify-center items-center'>
             {user && user.email ? (
                 isNewUser ? (
                     <NewUserModal setIsNewUser={setIsNewUser} email={user.email} setAppUser={setAppUser} user={user}/>
