@@ -29,6 +29,12 @@ export type Conversation = {
     isOnline: boolean
 }
 
+export type HeaderData = {
+    displayName: string, 
+    displayPfpFilePath: string, 
+    displayIsOnline: boolean
+}
+
 export const fetchUserFromDB = async (
     email: string, 
     newUserSetter: (isNewUser: boolean)=>void, 

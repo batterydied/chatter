@@ -1,7 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchUserFromDB } from './homePageHelpers'
-import type { AppUser, Conversation, FriendRequest } from './homePageHelpers'
+import type { AppUser, Conversation, FriendRequest, HeaderData } from './homePageHelpers'
 import NewUserModal from './components/NewUserPage'
 import FriendList from './components/FriendList'
 import ConversationWindow from './components/ConversationWindow'
@@ -21,6 +21,7 @@ import ProfilePanel from './components/ProfilePanel'
 import { HomePageContext } from '../../hooks/useHomePageContext'
 import { useAppContext } from '../../hooks/useAppContext'
 import { getPfpByFilePath } from '../../utils/getPfp'
+import { HeaderContext } from '../../hooks/useHeaderContext.ts'
 
 const HomePage = () => {
     const {user, logOut} = useAppContext()
@@ -34,7 +35,7 @@ const HomePage = () => {
     const [unreadRequest, setUnreadRequest] = useState(0)
     const requestCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
     const requestListRef = useRef<List>(null)
-    const [displayInfoRecord, setDisplayInfoRecord] = useState<Record<string, {displayName: string, displayPfpFilePath: string, displayIsOnline: boolean}>>({})
+    const [displayInfoRecord, setDisplayInfoRecord] = useState<Record<string, HeaderData>>({})
 
 
     const conversationCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
@@ -398,7 +399,9 @@ const HomePage = () => {
                                 </div>
                                 <div className='ml-2 p-2 w-full bg-base-300'>
                                     {selectedConversation ? 
-                                    <ConversationWindow conversation={selectedConversation} />
+                                    <HeaderContext value={displayInfoRecord[selectedConversation.id] || null}>
+                                        <ConversationWindow conversation={selectedConversation} />
+                                    </HeaderContext>
                                     : 
                                     <FriendList setSelectedConversation={setSelectedConversation}/>
                                     }
