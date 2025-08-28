@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @plugin "daisyui" {
-  themes: dark;
+  themes: dark, cupcake;
 }
 
 @keyframes fadeIn {
@@ -17,7 +17,7 @@
   .hover\:animate-spin-slow:hover {
     animation: spin 3s linear infinite;
   }
-  
+
   .animate-fade-in{
     animation: fadeIn 3s ease-out forwards;
   }

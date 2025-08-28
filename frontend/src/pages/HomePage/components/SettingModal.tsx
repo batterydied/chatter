@@ -90,16 +90,16 @@ const SettingModal = ({logOut}: SettingModalProps) => {
                                     <img src={previewUrl || getPfpByFilePath(user.pfpFilePath)} />
                                 </div>
                             </div>
-                            <div className='group absolute bottom-0 left-0 bg-gray-500 rounded-full p-2 hover:cursor-pointer hover:bg-gray-400' onClick={()=>inputRef.current?.click()}>
-                                <CameraIcon className='group-hover:text-gray-200 text-gray-300'/>
+                            <div className='group absolute bottom-0 left-0 bg-neutral-content rounded-full p-2 hover:cursor-pointer hover:bg-base-content' onClick={()=>inputRef.current?.click()}>
+                                <CameraIcon className='group-hover:text-base-200 text-base-100'/>
                             </div>
                         </div>)}
 
                         <input type="file" accept="image/*" className='hidden' ref={inputRef} onChange={handleFileChange}/>
 
-                        <div className='flex justify-center items-center m-5 border-2 p-2 rounded-md  border-gray-500 focus-within:border-accent'>
+                        <div className='flex justify-center items-center m-5 border-2 p-2 rounded-md  border-base-content focus-within:border-accent'>
                             <input onChange={(e)=>setUsername(truncateName(e.target.value))} value={username} className='focus:outline-none'/>
-                            <EditIcon className='text-gray-500'/>
+                            <EditIcon className='text-base-content'/>
                         </div>
                     </div>
                 </form>

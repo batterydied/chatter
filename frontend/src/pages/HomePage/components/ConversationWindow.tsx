@@ -507,7 +507,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                       setIsReactSelected(true)
                       setSelectedMessageId(msg.id)
                     }
-                  } className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
+                  } className='text-gray-300 hover:text-gray-400 hover:cursor-pointer mx-1' />
                   {user.id == msg.senderId && (
                       <EditIcon onClick={() => handleEdit(msg, index)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
                   )}

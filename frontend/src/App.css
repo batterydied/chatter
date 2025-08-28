@@ -22,3 +22,11 @@ button:hover{
 .btn:active{
   opacity: 0.8;
 }
+
+.list-row::after {
+  border-color: rgb(55 65 81);
+}
+
+.list-row:hover::after {
+  display: none;
+}

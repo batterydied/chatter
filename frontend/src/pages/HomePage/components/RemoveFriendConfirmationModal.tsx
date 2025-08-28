@@ -12,8 +12,8 @@ const RemoveFriendConfirmationModal = ({removeFriend, setRemoveFriend, sendRemov
                 <form method="dialog">
                     {/* if there is a button in form, it will close the modal */}
                     <div className='absolute bottom-2 right-4'>
-                        <button className="btn btn-sm bg-gray-500 mr-2 hover:!border-gray-500 hover:bg-gray-600" onClick={()=>setRemoveFriend(null)}>Cancel</button>
-                        <button className="btn btn-sm bg-red-500 hover:!border-red-500 hover:bg-red-600" onClick={()=>sendRemove(removeFriend!.friendId)}>Remove Friend</button>
+                        <button className="btn btn-sm bg-base-200 mr-2 hover:bg-base-300 border-0" onClick={()=>setRemoveFriend(null)}>Cancel</button>
+                        <button className="btn btn-sm bg-red-500 hover:bg-red-600 border-0" onClick={()=>sendRemove(removeFriend!.friendId)}>Remove Friend</button>
                     </div>
                 </form>
                 <h3 className="font-bold text-lg">Remove '{removeFriend?.username}'</h3>

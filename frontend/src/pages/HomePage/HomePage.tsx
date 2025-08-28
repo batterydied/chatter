@@ -283,11 +283,10 @@ const HomePage = () => {
                         src={getPfpByFilePath(
                             displayInfo ? displayInfo.displayPfpFilePath : conversation.pfpFilePath
                         )}
-                        alt="avatar"
                         />
                     </div>
                     </div>
-                    <div>{displayInfo ? displayInfo.displayName : conversation.name}</div>
+                    <div className='group-hover:text-neutral-content'>{displayInfo ? displayInfo.displayName : conversation.name}</div>
                 </div>
                 <XIcon
                     onClick={(e) => handleHideConversation(e, conversation)}
@@ -399,9 +398,9 @@ const HomePage = () => {
                                 </div>
                                 <div className='ml-2 p-2 w-full bg-base-300'>
                                     {selectedConversation ? 
-                                    <HeaderContext value={displayInfoRecord[selectedConversation.id] || null}>
+                                    <HeaderContext.Provider value={displayInfoRecord[selectedConversation.id] || null}>
                                         <ConversationWindow conversation={selectedConversation} />
-                                    </HeaderContext>
+                                    </HeaderContext.Provider>
                                     : 
                                     <FriendList setSelectedConversation={setSelectedConversation}/>
                                     }

@@ -16,7 +16,6 @@ const AuthPage = () => {
     const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
     const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : '';
     
-    // Skip known problematic GPUs (Intel / ANGLE / old drivers)
     if (renderer && /Intel/i.test(renderer)) return;
 
     setCanUseWebGL(true);

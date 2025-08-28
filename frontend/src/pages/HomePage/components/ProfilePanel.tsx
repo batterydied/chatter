@@ -19,10 +19,10 @@ const ProfilePanel = ({appUser, handleOpenSetting}: ProfilePanelProps) => {
                     </div>
                     <div className='pl-2'>
                         <p className='text-sm text-left'>{appUser?.username}</p>
-                        <p className='text-sm text-neutral-content'>ID: {appUser?.id}</p>
+                        <p className='text-sm'>ID: {appUser?.id}</p>
                     </div>
                 </div>
-                <GearsIcon onClick={handleOpenSetting} className='text-gray-400 hover:text-white hover:cursor-pointer hover:animate-spin-slow' size={32}/>
+                <GearsIcon onClick={handleOpenSetting} className='text-gray-400 hover:text-accent hover:cursor-pointer hover:animate-spin-slow' size={32}/>
             </div>
         </div>
     )
