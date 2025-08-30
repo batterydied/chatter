@@ -9,6 +9,7 @@ export type AppUser = {
     email: string,
     pfpFilePath: string,
     lastSeenRequest: Timestamp
+    theme: string | undefined
 }
 
 export type FriendRequest = {

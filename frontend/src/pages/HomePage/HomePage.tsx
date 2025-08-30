@@ -32,7 +32,7 @@ const HomePage = () => {
     const [loading, setLoading] = useState(true)
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
-    const [isSettingModalOpen, setIsSettingModalOpen] = useState(false)
+    const [settingModalOpen, setSettingModalOpen] = useState(false)
     const [modalOpen, setModalOpen] = useState(false)
     const [unreadRequest, setUnreadRequest] = useState(0)
     const requestCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
@@ -73,7 +73,7 @@ const HomePage = () => {
             const data = snapshot.data()
             setAppUser(prev => {
                 if(!prev) return prev
-                return {...prev, username: data.username, pfpFilePath: data.pfpFilePath, lastSeenRequest: data.lastSeenRequest || new Date()}})
+                return {...prev, theme: data.theme, username: data.username, pfpFilePath: data.pfpFilePath, lastSeenRequest: data.lastSeenRequest || new Date()}})
         })
         return unsub
     }, [appUser?.id])
@@ -83,6 +83,8 @@ const HomePage = () => {
         const count = friendRequests.reduce((acc, req)=> toDateSafe(req.createdAt) > toDateSafe(appUser.lastSeenRequest) ?  acc + 1 : acc
         , 0)
         setUnreadRequest(count)
+        const root = document.documentElement
+        root.setAttribute('data-theme', appUser.theme || 'dim')
     }, [appUser, friendRequests])
 
     useEffect(()=>{
@@ -332,15 +334,11 @@ const HomePage = () => {
                                     </div>
                                 </div>
                                 <div className='flex items-center'>
-                                    <div onClick={()=>handleAccept(request.requestId)}className='w-[30px] h-[30px] rounded-full mr-3 hover:outline-1 hover:outline-accent hover:cursor-pointer flex justify-center items-center'>
-                                        <div>
-                                            <CheckIcon className='text-gray-400 hover:text-red-500'/>
-                                        </div>
+                                    <div onClick={()=>handleAccept(request.requestId)}className='group w-[30px] h-[30px] rounded-full mr-3 hover:outline-1 hover:outline-accent hover:cursor-pointer flex justify-center items-center'>
+                                        <CheckIcon className='text-gray-400 group-hover:text-red-500'/>
                                     </div>
-                                    <div onClick={()=>handleDecline(request.requestId)} className='w-[30px] h-[30px] rounded-full hover:outline-1 hover:outline-accent hover:cursor-pointer flex justify-center items-center'>
-                                        <div>
-                                            <XIcon className='text-gray-400 hover:text-green-500' />
-                                        </div>
+                                    <div onClick={()=>handleDecline(request.requestId)} className='group w-[30px] h-[30px] rounded-full hover:outline-1 hover:outline-accent hover:cursor-pointer flex justify-center items-center'>
+                                        <XIcon className='text-gray-400 group-hover:text-green-500' />
                                     </div>
                                 </div>
                             </div>
@@ -358,7 +356,7 @@ const HomePage = () => {
     }, [])
 
     const handleOpenSetting = useCallback(() => {
-        setIsSettingModalOpen(true)
+        setSettingModalOpen(true)
     }, [])
 
     
@@ -380,8 +378,8 @@ const HomePage = () => {
                                 <div className='min-w-[360px]'>
                                     <ul className='list h-5/6 overflow-y-auto overflow-x-hidden'>
                                         <li>
-                                            <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 text-gray-400 hover:text-white' onClick={handleClearSelectConversation}>
-                                                <UserIcon className='text-gray-400 group-hover:text-white' />
+                                            <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 hover:text-accent' onClick={handleClearSelectConversation}>
+                                                <UserIcon className='group-hover:text-accent' />
                                                 Friends
                                             </button>
                                         </li>
@@ -389,7 +387,7 @@ const HomePage = () => {
                                             <FriendRequestBtn onClick={handleOpenRequest} count={modalOpen ? 0 : unreadRequest} />
                                         </li>
                                         <div className='border-b border-gray-700 pb-2' />
-                                        <div className='my-1 flex justify-start text-neutral-content text-sm'>
+                                        <div className='my-1 flex justify-start text-sm'>
                                             Direct Messages
                                         </div>
                                         <DynamicVList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
@@ -408,8 +406,7 @@ const HomePage = () => {
                                     }
                                 </div>
                                 <RequestModal isOpen={modalOpen} cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} onClose={handleCloseRequestModal} handleDeclineAll={handleDeclineAll}/>
-
-                                <SettingModal isOpen={isSettingModalOpen} onClose={()=>setIsSettingModalOpen(false)} logOut={logOut}/>
+                                <SettingModal isOpen={settingModalOpen} onClose={()=>setSettingModalOpen(false)} logOut={logOut}/>
                             </div>
                         </HomePageContext.Provider>
                     )

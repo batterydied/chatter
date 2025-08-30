@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @plugin "daisyui" {
-  themes: dark, light, cyberpunk, valentine, synthwave, coffee, pastel, forest, retro, aqua, valentine, retro;
+  themes: night, silk, cyberpunk, valentine, synthwave, caramellatte, abyss, forest, retro, dim, valentine, retro;
 }
 
 @keyframes fadeIn {

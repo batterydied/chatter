@@ -15,7 +15,7 @@ const ConversationHeader = ({conversation}: ConversationHeaderProps) => {
                 <img src={getPfpByFilePath(headerData ? headerData.displayPfpFilePath : conversation.pfpFilePath)} />
             </div>
             </div>
-            <div className='ml-2 text-white'>{headerData ? headerData.displayName : conversation.name}</div>
+            <div className='ml-2'>{headerData ? headerData.displayName : conversation.name}</div>
         </div>
     )
 

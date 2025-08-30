@@ -16,9 +16,9 @@ const RequestModal = ({isOpen, cacheRef, listRef, renderer, data, onClose, handl
                 <div className='w-full flex justify-end'>
                     <CloseButton onClick={onClose}/>
                 </div>
-                <h3 className="font-bold text-lg mb-2">Incoming Requests</h3>
+                <p className="font-bold text-lg m-2">Incoming Requests</p>
                 {data.length === 0 ?  <h3>There are no incoming requests.</h3> :
-                <div className='h-64'>
+                <div className='h-62'>
                     <VList cacheRef={cacheRef} listRef={listRef} data={data} renderer={renderer}/>
                 </div>
                 }

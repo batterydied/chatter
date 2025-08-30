@@ -14,6 +14,7 @@ import serializeFriends from "../../../utils/serializeFriends"
 import RemoveFriendConfirmationModal from "./RemoveFriendConfirmationModal"
 import { useHomePageContext } from "../../../hooks/useHomePageContext"
 import { getPfpByFilePath } from "../../../utils/getPfp"
+import ThemesModal from "./ThemesModal.tsx"
 
 type FriendListProps = {
     setSelectedConversation: (conversation: Conversation) => void
@@ -45,6 +46,7 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
     const [outgoingRequests, setOutgoingRequests] = useState<OutgoingRequest[]>([])
     const [requestModalOpen, setRequestModalOpen] = useState(false)
     const [addFriendModalOpen, setAddFriendModalOpen] = useState(false)
+    const [themesModalOpen, setThemesModalOpen] = useState(false)
     const [isReady, setIsReady] = useState(false)
 
     const cacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
@@ -224,6 +226,14 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
 
     const handleCloseOutgoingRequest = useCallback(() => {
         setRequestModalOpen(false)
+    }, [])
+
+    const handleOpenThemes = useCallback(()=>{
+        setThemesModalOpen(true)
+    }, [])
+
+    const handleCloseThemes = useCallback(()=>{
+        setThemesModalOpen(false)
     }, [])
 
     const sendRemove = useCallback(async (friendId: string) => {
@@ -445,14 +455,14 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
             <div className='mb-2 border-b border-gray-700 pb-2'>
                 <div className='flex items-center justify-between'>
                     <div className='flex items-start space-x-2'>
-                        <button className={`rounded-lg text-gray-400 btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${selectedOnline && '!bg-base-100'}`} onClick={handleOnlineFriends}>Online</button>
-                        <button className={`rounded-lg text-gray-400 btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${!selectedOnline && '!bg-base-100'}`} onClick={handleAllFriends}>All</button>
-                        <button className='rounded-lg text-gray-400 btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none' onClick={handleOutgoingRequest}>Outgoing Request</button>
+                        <button className={`rounded-lg btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${selectedOnline && '!bg-base-100 text-accent'}`} onClick={handleOnlineFriends}>Online</button>
+                        <button className={`rounded-lg btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${!selectedOnline && '!bg-base-100 text-accent'}`} onClick={handleAllFriends}>All</button>
+                        <button className='rounded-lg btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none' onClick={handleOutgoingRequest}>Outgoing Request</button>
                         <button className='text-neutral-content btn bg-neutral rounded-lg' onClick={handleAddFriend}>Add Friend</button>
                     </div>
                     
                     <div className='tooltip tooltip-secondary tooltip-left text-xs' data-tip='Themes'>
-                        <ThemesIcon className='hover:cursor-pointer hover:text-accent text-gray-400'/>
+                        <ThemesIcon onClick={handleOpenThemes} className='hover:cursor-pointer hover:text-accent text-gray-400'/>
                     </div>
                 </div>
             </div>
@@ -460,6 +470,7 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
             <RemoveFriendConfirmationModal removeFriend={removeFriend} setRemoveFriend={setRemoveFriend} sendRemove={sendRemove} />
             <AddFriendModal isOpen={addFriendModalOpen} handleSend={handleSend} searchId={searchId} setSearchId={setSearchId} handleCloseRequest={handleCloseRequest} errorMessage={errorMessage} successRequestMessage={successRequestMessage}/>
             <OutgoingRequestModal cacheRef={cacheRef} listRef={listRef} renderer={renderRequests} data={outgoingRequests} isOpen={requestModalOpen} onClose={handleCloseOutgoingRequest}/>
+            <ThemesModal isOpen={themesModalOpen} onClose={handleCloseThemes} />
         </div>
     )
 
