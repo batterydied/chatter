@@ -18,7 +18,7 @@ const OutgoingRequestModal = ({isOpen, cacheRef, listRef, renderer, data, onClos
                 <p className="font-bold text-lg m-2">Outgoing Requests</p>
                 {data.length === 0 ?  
                 <div className='p-30'>
-                    <h3>There are no outgoing requests.</h3> 
+                    <p>There are no outgoing requests.</p> 
                 </div>
                 :
                 <div className='h-64'>

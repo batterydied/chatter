@@ -12,12 +12,16 @@ type RequestModalProps = DynamicModalBaseProps & {
 const RequestModal = ({isOpen, cacheRef, listRef, renderer, data, onClose, handleDeclineAll} : RequestModalProps) => {
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
-            <>
+            <div className='w-full h-full'>
                 <div className='w-full flex justify-end'>
                     <CloseButton onClick={onClose}/>
                 </div>
                 <p className="font-bold text-lg m-2">Incoming Requests</p>
-                {data.length === 0 ?  <h3>There are no incoming requests.</h3> :
+                {data.length === 0 ?  
+                <div className='p-30'>
+                    <p>There are no incoming requests.</p>
+                </div> 
+                :
                 <div className='h-62'>
                     <VList cacheRef={cacheRef} listRef={listRef} data={data} renderer={renderer}/>
                 </div>
@@ -29,7 +33,7 @@ const RequestModal = ({isOpen, cacheRef, listRef, renderer, data, onClose, handl
                     </button>
                 </div>
                 }
-            </>
+            </div>
         </Modal>
     )
 }
