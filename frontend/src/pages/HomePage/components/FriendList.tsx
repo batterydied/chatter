@@ -44,6 +44,7 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
     const [errorMessage, setErrorMessage] = useState('')
     const [outgoingRequests, setOutgoingRequests] = useState<OutgoingRequest[]>([])
     const [requestModalOpen, setRequestModalOpen] = useState(false)
+    const [addFriendModalOpen, setAddFriendModalOpen] = useState(false)
     const [isReady, setIsReady] = useState(false)
 
     const cacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
@@ -107,7 +108,7 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
     }
 
     const handleAddFriend = () => {
-        (document.getElementById('add_friend_modal') as HTMLDialogElement)!.showModal();
+        setAddFriendModalOpen(true)
     }
 
     const renderRequests: ListRowRenderer= ({ index, key, parent, style }) => {
@@ -214,12 +215,16 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
         setSearchId('')
         setSuccessRequestMessage(false)
         setErrorMessage('')
+        setAddFriendModalOpen(false)
     }, [])
 
-    const handleOutgoingRequest = () => {
-        (document.getElementById('outgoing_request_modal') as HTMLDialogElement)!.showModal();
+    const handleOutgoingRequest = useCallback(() => {
         setRequestModalOpen(true)
-    }
+    }, [])
+
+    const handleCloseOutgoingRequest = useCallback(() => {
+        setRequestModalOpen(false)
+    }, [])
 
     const sendRemove = useCallback(async (friendId: string) => {
         try{
@@ -453,8 +458,8 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
             </div>
             <VList cacheRef={cacheRef} listRef={listRef} renderer={renderFriends} data={selectedOnline ? onlineFriends : friends}/>
             <RemoveFriendConfirmationModal removeFriend={removeFriend} setRemoveFriend={setRemoveFriend} sendRemove={sendRemove} />
-            <AddFriendModal handleSend={handleSend} searchId={searchId} setSearchId={setSearchId} handleCloseRequest={handleCloseRequest} errorMessage={errorMessage} successRequestMessage={successRequestMessage}/>
-            <OutgoingRequestModal cacheRef={cacheRef} listRef={listRef} renderer={renderRequests} data={outgoingRequests} setModalOpen={setRequestModalOpen}/>
+            <AddFriendModal isOpen={addFriendModalOpen} handleSend={handleSend} searchId={searchId} setSearchId={setSearchId} handleCloseRequest={handleCloseRequest} errorMessage={errorMessage} successRequestMessage={successRequestMessage}/>
+            <OutgoingRequestModal cacheRef={cacheRef} listRef={listRef} renderer={renderRequests} data={outgoingRequests} isOpen={requestModalOpen} onClose={handleCloseOutgoingRequest}/>
         </div>
     )
 

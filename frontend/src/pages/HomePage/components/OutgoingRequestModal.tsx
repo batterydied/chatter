@@ -1,38 +1,41 @@
 import { AutoSizer, List} from "react-virtualized"
 import type { DynamicModalBaseProps } from "../../../utils/ModalBaseProps"
+import Modal from "./Modal"
 
 type OutgoingRequestModalProps = DynamicModalBaseProps & {
-    setModalOpen: (open: boolean) => void
+    onClose: () => void,
+    isOpen: boolean
 }
 
-const OutgoingRequestModal = ({cacheRef, listRef, renderer, data, setModalOpen}: OutgoingRequestModalProps) => {
+const OutgoingRequestModal = ({isOpen, cacheRef, listRef, renderer, data, onClose}: OutgoingRequestModalProps) => {
     return (
-        <dialog id="outgoing_request_modal" className="modal" onCancel={()=>setModalOpen(false)}>
-            <div className="modal-box">
-                <form method="dialog">
-                    {/* if there is a button in form, it will close the modal */}
-                    <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={()=>setModalOpen(false)}>✕</button>
-                    <h3 className="font-bold text-lg">Outgoing Requests</h3>
-                    {data.length === 0 ?  <h3>There are no outgoing requests.</h3> :
-                    <div className='h-64'>
-                        <AutoSizer>
-                            {({width, height})=>
-                            <List
-                                width={width}
-                                height={height}
-                                rowHeight={cacheRef.current.rowHeight}
-                                deferredMeasurementCache={cacheRef.current}
-                                rowCount={data.length}
-                                rowRenderer={renderer}
-                                ref={listRef}
-                            />
-                            }           
-                        </AutoSizer>
-                    </div>
-                    }
-                </form>
+        <Modal isOpen={isOpen} onClose={onClose}>
+            <div className='w-full h-full'>
+                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
+                <h3 className="font-bold text-lg mt-4">Outgoing Requests</h3>
+                {data.length === 0 ?  
+                <div className='p-35'>
+                    <h3>There are no outgoing requests.</h3> 
+                </div>
+                :
+                <div className='h-64'>
+                    <AutoSizer>
+                        {({width, height})=>
+                        <List
+                            width={width}
+                            height={height}
+                            rowHeight={cacheRef.current.rowHeight}
+                            deferredMeasurementCache={cacheRef.current}
+                            rowCount={data.length}
+                            rowRenderer={renderer}
+                            ref={listRef}
+                        />
+                        }           
+                    </AutoSizer>
+                </div>
+                }
             </div>
-        </dialog>
+        </Modal>
     )
 }
 
