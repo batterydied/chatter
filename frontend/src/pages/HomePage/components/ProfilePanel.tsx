@@ -9,7 +9,7 @@ type ProfilePanelProps = {
 
 const ProfilePanel = ({appUser, handleOpenSetting}: ProfilePanelProps) => {
     return (
-        <div className='flex items-end h-1/6 w-full'>
+        <div className='flex items-end h-1/6 w-full z-50'>
             <div className='flex w-full h-[100px] justify-between items-center bg-base-300 p-5 rounded-2xl outline-1 outline-base-100'>
                 <div className='flex flex-row items-center'>
                     <div className="avatar avatar-online avatar-placeholder">
@@ -22,7 +22,9 @@ const ProfilePanel = ({appUser, handleOpenSetting}: ProfilePanelProps) => {
                         <p className='text-sm'>ID: {appUser?.id}</p>
                     </div>
                 </div>
-                <GearsIcon onClick={handleOpenSetting} className='text-gray-400 hover:text-accent hover:cursor-pointer hover:animate-spin-slow' size={32}/>
+                <div className='hover:bg-neutral rounded-md p-1'>
+                    <GearsIcon onClick={handleOpenSetting} className='text-gray-400 hover:text-neutral-content hover:cursor-pointer hover:animate-spin-once' size={32}/>
+                </div>
             </div>
         </div>
     )

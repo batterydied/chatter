@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @plugin "daisyui" {
-  themes: dark, cupcake;
+  themes: dark, light, cyberpunk, valentine, synthwave, coffee, pastel, forest, retro, aqua, valentine, retro;
 }
 
 @keyframes fadeIn {
@@ -9,13 +9,14 @@
   100% { opacity: 1; }
 }
 
-@layer utilities{
-  .animate-spin-slow {
-    animation: spin 3s linear infinite;
-  }
+@keyframes spin-once {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
-  .hover\:animate-spin-slow:hover {
-    animation: spin 3s linear infinite;
+@layer utilities{
+  .hover\:animate-spin-once:hover {
+    animation: spin-once 0.5s linear forwards;
   }
 
   .animate-fade-in{

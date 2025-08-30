@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { CameraIcon, EditIcon, LogOutIcon } from "../../../assets/icons"
+import { CameraIcon, EditIcon, LogOutIcon} from "../../../assets/icons"
 import { getPfpByFilePath } from "../../../utils/getPfp"
 import truncateName from "../../../utils/truncateName"
 import { doc, updateDoc } from "firebase/firestore"
@@ -8,14 +8,17 @@ import { toast } from "sonner"
 import AvatarEditorModal from "./AvatarEditorModal"
 import { supabase } from "../../../config/supabase"
 import { useHomePageContext } from "../../../hooks/useHomePageContext"
+import Modal from "./Modal"
+import CloseButton from "./CloseButton"
 
 
 type SettingModalProps = {
     logOut: () => void,
+    isOpen: boolean,
+    onClose: () => void
 }
 
-
-const SettingModal = ({logOut}: SettingModalProps) => {
+const SettingModal = ({isOpen, onClose, logOut}: SettingModalProps) => {
     const user = useHomePageContext()
     const [username, setUsername] = useState(user.username)
     const [previewUrl, setPreviewUrl] = useState('')
@@ -73,40 +76,43 @@ const SettingModal = ({logOut}: SettingModalProps) => {
     }
 
     return (
-        <dialog id="setting_modal" className="modal" onClose={()=>setUsername(user.username)}>
-            <div className="modal-box">
-                <form method="dialog" onSubmit={(e) => e.preventDefault()}>
-                    {/* if there is a button in form, it will close the modal */}
-                    <div className='w-full flex justify-end'>
-                        <LogOutIcon className='hover:cursor-pointer text-red-800 hover:text-red-600' onClick={logOut}/>
-                    </div>
-                    <div className='flex flex-col justify-center items-center'>
-                        {shouldOpenAvatarEditor ? 
-                        <AvatarEditorModal setShouldOpenAvatarEditor={setShouldOpenAvatarEditor} scale={scale} setScale={setScale} img={previewUrl} setPreviewUrl={setPreviewUrl} setImgBlob={setImgBlob}/>
-                        :
-                        (<div className='relative'>
-                            <div className='avatar'>
-                                <div className='w-30 rounded-full'>
-                                    <img src={previewUrl || getPfpByFilePath(user.pfpFilePath)} />
-                                </div>
+        <Modal isOpen={isOpen} onClose={onClose}>
+            <div className='flex flex-col w-full h-full'>
+                <div className='w-full flex items-center justify-end'>
+                    <CloseButton onClick={onClose}/>
+                </div>
+                <div className='flex flex-col justify-center items-center py-8'>
+                    {shouldOpenAvatarEditor ? 
+                    <AvatarEditorModal setShouldOpenAvatarEditor={setShouldOpenAvatarEditor} scale={scale} setScale={setScale} img={previewUrl} setPreviewUrl={setPreviewUrl} setImgBlob={setImgBlob}/>
+                    :
+                    (<div className='relative'>
+                        <div className='avatar'>
+                            <div className='w-30 rounded-full'>
+                                <img src={previewUrl || getPfpByFilePath(user.pfpFilePath)} />
                             </div>
-                            <div className='group absolute bottom-0 left-0 bg-neutral-content rounded-full p-2 hover:cursor-pointer hover:bg-base-content' onClick={()=>inputRef.current?.click()}>
-                                <CameraIcon className='group-hover:text-base-200 text-base-100'/>
-                            </div>
-                        </div>)}
-
-                        <input type="file" accept="image/*" className='hidden' ref={inputRef} onChange={handleFileChange}/>
-
-                        <div className='flex justify-center items-center m-5 border-2 p-2 rounded-md  border-base-content focus-within:border-accent'>
-                            <input onChange={(e)=>setUsername(truncateName(e.target.value))} value={username} className='focus:outline-none'/>
-                            <EditIcon className='text-base-content'/>
                         </div>
+                        <div className='group absolute bottom-0 left-0 bg-neutral-content rounded-full p-2 hover:cursor-pointer hover:bg-base-content' onClick={()=>inputRef.current?.click()}>
+                            <CameraIcon className='group-hover:text-base-200 text-base-100'/>
+                        </div>
+                    </div>)}
+
+                    <input type="file" accept="image/*" className='hidden' ref={inputRef} onChange={handleFileChange}/>
+
+                    <div className='flex justify-center items-center m-5 border-2 p-2 rounded-md  border-base-content focus-within:border-accent'>
+                        <input onChange={(e)=>setUsername(truncateName(e.target.value))} value={username} className='focus:outline-none'/>
+                        <EditIcon className='text-base-content'/>
                     </div>
-                </form>
-                {isEdited() && username != '' && <button className='btn' onClick={handleUpdateUser}>Save Changes</button>}
-                <div className='mt-4 text-sm'>Press (esc) to exit out of setting</div>
+                    <div className={`w-full ${(!isEdited() || username == '') && 'invisible'}`}>
+                        <button className='btn' onClick={handleUpdateUser}>Save Changes</button>
+                    </div>
+                </div>
+                <div className='flex justify-end flex-grow items-end p-4'>
+                    <div className='tooltip tooltip-secondary' data-tip="Logout">
+                        <LogOutIcon className='text-red-700 hover:text-red-600 hover:cursor-pointer' onClick={logOut}/>
+                    </div>
+                </div>
             </div>
-        </dialog>
+        </Modal>
     )
 }
 

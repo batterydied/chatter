@@ -280,6 +280,11 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     let updatedReactions: Reaction[] = []
     const updatedMessages = messages.map((m)=>{
       if(m.id == msgId){
+        updatedReactions = m.reactions
+        const alreadyReacted = m.reactions.some(
+          r => r.user === user.id && r.emoji === emoji
+        );
+        if(alreadyReacted) return m
         updatedReactions = [...m.reactions, {user: user.id, emoji }]
         return {...m, reactions: updatedReactions}
       }
@@ -499,7 +504,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                     (edited)
                   </span>
               )}
-      
+
               {isHovered && (
                 <div className="absolute right-4 -top-2 p-2 bg-base-100 outline-1 outline-base-200 rounded-md flex items-center">
                   <SmileIcon onClick={
@@ -507,11 +512,11 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                       setIsReactSelected(true)
                       setSelectedMessageId(msg.id)
                     }
-                  } className='text-gray-300 hover:text-gray-400 hover:cursor-pointer mx-1' />
+                  } className='text-gray-400 rounded-md hover:bg-neutral hover:text-neutral-content hover:cursor-pointer mx-1' />
                   {user.id == msg.senderId && (
-                      <EditIcon onClick={() => handleEdit(msg, index)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
+                      <EditIcon onClick={() => handleEdit(msg, index)} className='text-gray-400 rounded-md hover:bg-neutral hover:text-neutral-content hover:cursor-pointer mx-1' />
                   )}
-                  <ReplyIcon onClick={() => handleReply(msg)} className='text-gray-400 hover:text-white hover:cursor-pointer mx-1' />
+                  <ReplyIcon onClick={() => handleReply(msg)} className='text-gray-400 rounded-md hover:bg-neutral hover:text-neutral-content hover:cursor-pointer mx-1' />
                   {user.id == msg.senderId && (
                       <DeleteIcon onClick={() => handleDeleteConfirmation(msg)} className="text-red-800 hover:text-red-600 hover:cursor-pointer mx-1" />
                   )}
@@ -708,7 +713,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   return (
     <div className='h-full w-full flex flex-col relative'>
         {isReactSelected && 
-            <div className="absolute inset-0 z-[99999] flex items-center justify-center" onClick={()=>setIsReactSelected(false)}>
+            <div className="absolute inset-0 z-50 flex items-center justify-center" onClick={()=>setIsReactSelected(false)}>
                 <div onClick={(e)=>e.stopPropagation()}>
                   <EmojiPicker lazyLoadEmojis={true} theme={'dark' as Theme} onEmojiClick={(e)=>handleReact(e.emoji)}/>
                 </div>
@@ -716,10 +721,9 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
         }
         <ConversationHeader conversation={conversation} />
         {loadingMore && <span className="loading loading-dots loading-md self-center"></span>}
-        <div className='w-full h-screen relative'>
+        <div className='h-full w-full relative'>
           <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} data={messages} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length: undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>
         </div>
-      <div>
         <div className='relative'>
           <div className="absolute right-0 bottom-full" ref={pickerRef}>
             <EmojiPicker 
@@ -740,7 +744,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
             >
               Replying to {getUsername(replyMessage.senderId)}
               
-              <XIcon className='hover:cursor-pointer text-gray-400 hover:text-white' onClick={()=>setReplyMessage(null)}/>
+              <XIcon className='hover:cursor-pointer text-gray-400 hover:text-neutral-content' onClick={()=>setReplyMessage(null)}/>
             </div>}
             <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-center p-2'>
               <textarea
@@ -762,14 +766,12 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                 ref={textareaRef}
                 className="focus:outline-none textarea-md w-[90%] resize-none overflow-auto !min-h-0"
               />
-              <div className='group hover:bg-base-100 p-1 rounded-md' ref={pickerIconRef}>
-                <SmileIcon onClick={handlePicker} className={`hover:cursor-pointer group-hover:text-gray-400 ${shouldOpenPicker ? '!text-white' : 'text-gray-600'}`} />
+              <div className='group hover:bg-neutral p-1 rounded-md' ref={pickerIconRef}>
+                  <SmileIcon onClick={handlePicker} className={`hover:cursor-pointer group-hover:text-neutral-content ${shouldOpenPicker ? '!text-accent' : 'text-gray-600'}`} />
               </div>
             </div>
           </div>
         </div>
-
-      </div>
       <DeleteMessageModal deleteMessage={deleteMessage} username={getUsername(deleteMessage?.senderId || '')} setDeleteMessage={setDeleteMessage} sendDelete={sendDelete}/>
     </div>
   )

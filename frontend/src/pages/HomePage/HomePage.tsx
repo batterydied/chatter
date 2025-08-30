@@ -22,6 +22,7 @@ import { HomePageContext } from '../../hooks/useHomePageContext'
 import { useAppContext } from '../../hooks/useAppContext'
 import { getPfpByFilePath } from '../../utils/getPfp'
 import { HeaderContext } from '../../hooks/useHeaderContext.ts'
+import CloseButton from './components/CloseButton.tsx'
 
 const HomePage = () => {
     const {user, logOut} = useAppContext()
@@ -31,6 +32,7 @@ const HomePage = () => {
     const [loading, setLoading] = useState(true)
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
+    const [isSettingModalOpen, setIsSettingModalOpen] = useState(false)
     const [modalOpen, setModalOpen] = useState(false)
     const [unreadRequest, setUnreadRequest] = useState(0)
     const requestCacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
@@ -288,10 +290,9 @@ const HomePage = () => {
                     </div>
                     <div className='group-hover:text-neutral-content'>{displayInfo ? displayInfo.displayName : conversation.name}</div>
                 </div>
-                <XIcon
-                    onClick={(e) => handleHideConversation(e, conversation)}
-                    className="hidden group-hover:block rounded-full hover:outline-1 hover:outline-accent text-gray-400 hover:text-white"
-                />
+                <div onClick={(e) => handleHideConversation(e, conversation)}>
+                    <CloseButton className='hidden group-hover:block' />
+                </div>
                 </li>
             </div>
             )}
@@ -314,7 +315,7 @@ const HomePage = () => {
                 {()=>{
                     return (
                         <div style={style}>
-                            <div className='p-2 hover:bg-base-200 flex justify-between'>
+                            <div className='p-1 hover:bg-base-200 flex justify-between'>
                                 <div className='flex flex-row items-center'>
                                     <div className='avatar mr-2'>
                                         <div className='h-10 rounded-full'>
@@ -330,18 +331,18 @@ const HomePage = () => {
                                         </div>
                                     </div>
                                 </div>
-                                    <div className='flex items-center'>
-                                        <div onClick={()=>handleAccept(request.requestId)}className='w-[30px] h-[30px] rounded-full bg-green-600 mr-6 hover:cursor-pointer hover:bg-green-700 active:bg-green-800 flex justify-center items-center'>
-                                            <div>
-                                                <CheckIcon className='text-black'/>
-                                            </div>
-                                        </div>
-                                        <div onClick={()=>handleDecline(request.requestId)} className='w-[30px] h-[30px] rounded-full bg-red-600 hover:cursor-pointer hover:bg-red-700 active:bg-red-800 flex justify-center items-center'>
-                                            <div>
-                                                <XIcon className='text-black' />
-                                            </div>
+                                <div className='flex items-center'>
+                                    <div onClick={()=>handleAccept(request.requestId)}className='w-[30px] h-[30px] rounded-full mr-3 hover:outline-1 hover:outline-accent hover:cursor-pointer flex justify-center items-center'>
+                                        <div>
+                                            <CheckIcon className='text-gray-400 hover:text-red-500'/>
                                         </div>
                                     </div>
+                                    <div onClick={()=>handleDecline(request.requestId)} className='w-[30px] h-[30px] rounded-full hover:outline-1 hover:outline-accent hover:cursor-pointer flex justify-center items-center'>
+                                        <div>
+                                            <XIcon className='text-gray-400 hover:text-green-500' />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )
@@ -353,13 +354,14 @@ const HomePage = () => {
 
 
     const handleOpenRequest = useCallback(() => {
-        (document.getElementById('request_modal') as HTMLDialogElement)!.showModal();
         setModalOpen(true)
     }, [])
 
     const handleOpenSetting = useCallback(() => {
-        (document.getElementById('setting_modal') as HTMLDialogElement)!.showModal()
+        setIsSettingModalOpen(true)
     }, [])
+
+    
 
     const handleClearSelectConversation = useCallback(() => {
         setSelectedConversation(null)
@@ -387,7 +389,7 @@ const HomePage = () => {
                                             <FriendRequestBtn onClick={handleOpenRequest} count={modalOpen ? 0 : unreadRequest} />
                                         </li>
                                         <div className='border-b border-gray-700 pb-2' />
-                                        <div className='my-1 flex justify-start text-gray-600 text-sm'>
+                                        <div className='my-1 flex justify-start text-neutral-content text-sm'>
                                             Direct Messages
                                         </div>
                                         <DynamicVList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
@@ -405,9 +407,9 @@ const HomePage = () => {
                                     <FriendList setSelectedConversation={setSelectedConversation}/>
                                     }
                                 </div>
-                                <RequestModal cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} onClose={handleCloseRequestModal} handleDeclineAll={handleDeclineAll}/>
+                                <RequestModal isOpen={modalOpen} cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} onClose={handleCloseRequestModal} handleDeclineAll={handleDeclineAll}/>
 
-                                <SettingModal logOut={logOut}/>
+                                <SettingModal isOpen={isSettingModalOpen} onClose={()=>setIsSettingModalOpen(false)} logOut={logOut}/>
                             </div>
                         </HomePageContext.Provider>
                     )

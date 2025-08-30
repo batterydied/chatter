@@ -3,7 +3,7 @@ import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { doc, getDoc, query, collection, where, getDocs, onSnapshot, and, or, DocumentSnapshot, deleteDoc, updateDoc } from 'firebase/firestore'
 import { CellMeasurer, CellMeasurerCache, List, type ListRowRenderer } from "react-virtualized"
-import { RemoveUserIcon } from "../../../assets/icons"
+import { RemoveUserIcon, ThemesIcon } from "../../../assets/icons"
 import { toast } from "sonner"
 import { serializeName, type Conversation } from "../homePageHelpers"
 import Loading from "./Loading"
@@ -38,14 +38,12 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
     const user = useHomePageContext()
     const [friends, setFriends] = useState<Friend[]>([])
     const [selectedOnline, setSelectedOnline] = useState<boolean>(true)
-    const onlineFriendRef = useRef<HTMLButtonElement>(null)
-    const allFriendRef = useRef<HTMLButtonElement>(null)
     const [removeFriend, setRemoveFriend] = useState<Friend | null>(null)
     const [searchId, setSearchId] = useState<string>('')
     const [successRequestMessage, setSuccessRequestMessage] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
     const [outgoingRequests, setOutgoingRequests] = useState<OutgoingRequest[]>([])
-    const [modalOpen, setModalOpen] = useState(false)
+    const [requestModalOpen, setRequestModalOpen] = useState(false)
     const [isReady, setIsReady] = useState(false)
 
     const cacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
@@ -220,7 +218,7 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
 
     const handleOutgoingRequest = () => {
         (document.getElementById('outgoing_request_modal') as HTMLDialogElement)!.showModal();
-        setModalOpen(true)
+        setRequestModalOpen(true)
     }
 
     const sendRemove = useCallback(async (friendId: string) => {
@@ -353,7 +351,7 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
     }, [user.id])
 
     useEffect(()=>{
-        if(!modalOpen) return
+        if(!requestModalOpen) return
 
         const fetchUpdatedRequests = async () => {
         const updatedRequests = await Promise.all(
@@ -377,7 +375,7 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
     fetchUpdatedRequests();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [modalOpen])
+    }, [requestModalOpen])
 
     useEffect(() => {
         const currentFriendsSet = new Set(friends.map(f => f.friendId));
@@ -438,19 +436,25 @@ const FriendList = ({setSelectedConversation}: FriendListProps) => {
 
     if(!isReady) return <Loading />
     return (
-        <div className='list justify-start h-full overflow-hidden'>
+        <div className='list justify-start h-full overflow-hidden min-w-[450px]'>
             <div className='mb-2 border-b border-gray-700 pb-2'>
-                <div className='flex items-start space-x-2'>
-                    <button ref={onlineFriendRef} className={`btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${selectedOnline && '!bg-base-100'}`} onClick={handleOnlineFriends}>Online</button>
-                    <button ref={allFriendRef} className={`btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${!selectedOnline && '!bg-base-100'}`} onClick={handleAllFriends}>All</button>
-                    <button className='btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none' onClick={handleOutgoingRequest}>Outgoing Request</button>
-                    <button className='btn bg-primary rounded-lg' onClick={handleAddFriend}>Add Friend</button>
+                <div className='flex items-center justify-between'>
+                    <div className='flex items-start space-x-2'>
+                        <button className={`rounded-lg text-gray-400 btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${selectedOnline && '!bg-base-100'}`} onClick={handleOnlineFriends}>Online</button>
+                        <button className={`rounded-lg text-gray-400 btn bg-base-300 focus:ring-0 shadow-none border-0 hover:border hover:bg-base-100 hover:border-none ${!selectedOnline && '!bg-base-100'}`} onClick={handleAllFriends}>All</button>
+                        <button className='rounded-lg text-gray-400 btn bg-base-300 focus:outline-none shadow-none border-0 hover:border hover:bg-base-100 hover:border-none' onClick={handleOutgoingRequest}>Outgoing Request</button>
+                        <button className='text-neutral-content btn bg-neutral rounded-lg' onClick={handleAddFriend}>Add Friend</button>
+                    </div>
+                    
+                    <div className='tooltip tooltip-secondary tooltip-left text-xs' data-tip='Themes'>
+                        <ThemesIcon className='hover:cursor-pointer hover:text-accent text-gray-400'/>
+                    </div>
                 </div>
             </div>
             <VList cacheRef={cacheRef} listRef={listRef} renderer={renderFriends} data={selectedOnline ? onlineFriends : friends}/>
             <RemoveFriendConfirmationModal removeFriend={removeFriend} setRemoveFriend={setRemoveFriend} sendRemove={sendRemove} />
             <AddFriendModal handleSend={handleSend} searchId={searchId} setSearchId={setSearchId} handleCloseRequest={handleCloseRequest} errorMessage={errorMessage} successRequestMessage={successRequestMessage}/>
-            <OutgoingRequestModal cacheRef={cacheRef} listRef={listRef} renderer={renderRequests} data={outgoingRequests} setModalOpen={setModalOpen}/>
+            <OutgoingRequestModal cacheRef={cacheRef} listRef={listRef} renderer={renderRequests} data={outgoingRequests} setModalOpen={setRequestModalOpen}/>
         </div>
     )
 
