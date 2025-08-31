@@ -3,7 +3,7 @@ import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore'
 import type { Timestamp } from 'firebase/firestore'
-import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon } from '../../../assets/icons'
+import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon, PlusIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
 import { CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
@@ -19,6 +19,7 @@ import serializeMessages from '../../../utils/serializeMessages'
 import ConversationHeader from './ConversationHeader'
 import formatMessageTime from '../../../utils/formatMessageTime'
 import { useHomePageContext } from '../../../hooks/useHomePageContext'
+import truncateMessage from '../../../utils/truncateMessage'
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -63,7 +64,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   const [earliestMessageId, setEarliestMessageId] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<SerializedMessage | null>(null)
   const [editMessage, setEditMessage] = useState<SerializedMessage | null>(null)
-  const [editMessageInputMessage, setEditMessageInputMessage] = useState('')
+  const [editInputMessage, setEditInputMessage] = useState('')
   const [replyMessage, setReplyMessage] = useState<SerializedMessage | null>(null)
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false)
   const [initialScrollDone, setInitialScrollDone] = useState(false)
@@ -197,7 +198,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     }
     cacheRef.current.clear(index, 0)
     setEditMessage(msg)
-    setEditMessageInputMessage(msg.text)
+    setEditInputMessage(msg.text)
     listRef.current?.recomputeRowHeights(index)
   }
   
@@ -246,7 +247,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
         cancelEdit()
       }
       if(e.key === 'Enter'){
-        handleUpdate(editMessage!, editMessageInputMessage)
+        handleUpdate(editMessage!, editInputMessage)
       }
     };
 
@@ -259,7 +260,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editMessage, editMessageInputMessage, handleUpdate]);
+  }, [editMessage, editInputMessage, handleUpdate]);
 
   useEffect(() => {
     let last = 0
@@ -459,10 +460,11 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                           }
                         }}
                         onChange={(e) => {
-                          setEditMessageInputMessage(e.target.value)
+                          const value = truncateMessage(e.target.value)
+                          setEditInputMessage(value)
                         }}
                         className="textarea w-full focus:outline-none border-0 focus:shadow-none shadow-none resize-none"
-                        value={editMessageInputMessage}
+                        value={editInputMessage}
                       />
                       <p className="text-sm">
                         Escape to <span className="text-accent">cancel</span>, enter to 
@@ -746,26 +748,32 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
               
               <XIcon className='hover:cursor-pointer text-gray-400 hover:text-neutral-content' onClick={()=>setReplyMessage(null)}/>
             </div>}
-            <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-center p-2'>
-              <textarea
-                id="chat-message"
-                rows={1}
-                placeholder="Type a message..."
-                value={newMessage}
-                onChange={(e) => {
-                  setNewMessage(e.target.value);
-                  e.currentTarget.style.height = 'auto'; // Reset height
-                  e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // Resize
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-                ref={textareaRef}
-                className="focus:outline-none textarea-md w-[90%] resize-none overflow-auto !min-h-0"
-              />
+            <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-start p-2'>
+              <div className='flex flex-row items-start w-full flex-1'>
+                <div className='group hover:bg-neutral p-1 rounded-md !mr-1' ref={pickerIconRef}>
+                    <PlusIcon onClick={handlePicker} className={`hover:cursor-pointer group-hover:text-neutral-content ${shouldOpenPicker ? '!text-accent' : 'text-gray-600'}`} />
+                </div>
+                <textarea
+                  id="chat-message"
+                  rows={1}
+                  placeholder="Type a message..."
+                  value={newMessage}
+                  onChange={(e) => {
+                    const value = truncateMessage(e.target.value)
+                    setNewMessage(value);
+                    e.currentTarget.style.height = 'auto'; // Reset height
+                    e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // Resize
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit();
+                    }
+                  }}
+                  ref={textareaRef}
+                  className="focus:outline-none textarea-md resize-none overflow-auto !w-full max-h-40 mt-1.25"
+                />
+              </div>
               <div className='group hover:bg-neutral p-1 rounded-md' ref={pickerIconRef}>
                   <SmileIcon onClick={handlePicker} className={`hover:cursor-pointer group-hover:text-neutral-content ${shouldOpenPicker ? '!text-accent' : 'text-gray-600'}`} />
               </div>

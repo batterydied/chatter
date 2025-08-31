@@ -123,3 +123,11 @@ export const CameraIcon = ({className, onClick, size=24}: IconProps) => {
         </svg>
     )
 }
+
+export const PlusIcon = ({className, onClick, size=24}: IconProps) => {
+    return (
+        <svg className={className} onClick={onClick} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} color="currentColor" fill="none">
+            <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
+        </svg>
+    )
+}
