@@ -85,32 +85,37 @@ const SettingModal = ({isOpen, onClose, logOut}: SettingModalProps) => {
                     {shouldOpenAvatarEditor ? 
                     <AvatarEditorModal setShouldOpenAvatarEditor={setShouldOpenAvatarEditor} scale={scale} setScale={setScale} img={previewUrl} setPreviewUrl={setPreviewUrl} setImgBlob={setImgBlob}/>
                     :
-                    (<div className='relative'>
-                        <div className='avatar'>
-                            <div className='w-30 rounded-full'>
-                                <img src={previewUrl || getPfpByFilePath(user.pfpFilePath)} />
+                    (
+                    <>
+                        <div className='relative'>
+                            <div className='avatar'>
+                                <div className='w-30 rounded-full'>
+                                    <img src={previewUrl || getPfpByFilePath(user.pfpFilePath)} />
+                                </div>
+                            </div>
+                            <div className='group absolute bottom-0 left-0 bg-neutral-content rounded-full p-2 hover:cursor-pointer hover:bg-base-content' onClick={()=>inputRef.current?.click()}>
+                                <CameraIcon className='group-hover:text-base-200 text-base-100'/>
                             </div>
                         </div>
-                        <div className='group absolute bottom-0 left-0 bg-neutral-content rounded-full p-2 hover:cursor-pointer hover:bg-base-content' onClick={()=>inputRef.current?.click()}>
-                            <CameraIcon className='group-hover:text-base-200 text-base-100'/>
+                        <input type="file" accept="image/*" className='hidden' ref={inputRef} onChange={handleFileChange}/>
+
+                        <div className='flex justify-center items-center m-5 border-2 p-2 rounded-md  border-base-content focus-within:border-accent'>
+                            <input onChange={(e)=>setUsername(truncateName(e.target.value))} value={username} className='focus:outline-none'/>
+                            <EditIcon className='text-base-content'/>
                         </div>
-                    </div>)}
-
-                    <input type="file" accept="image/*" className='hidden' ref={inputRef} onChange={handleFileChange}/>
-
-                    <div className='flex justify-center items-center m-5 border-2 p-2 rounded-md  border-base-content focus-within:border-accent'>
-                        <input onChange={(e)=>setUsername(truncateName(e.target.value))} value={username} className='focus:outline-none'/>
-                        <EditIcon className='text-base-content'/>
-                    </div>
-                    <div className={`w-full ${(!isEdited() || username == '') && 'invisible'}`}>
-                        <button className='btn' onClick={handleUpdateUser}>Save Changes</button>
-                    </div>
+                        <div className={`w-full ${(!isEdited() || username == '') && 'invisible'}`}>
+                            <button className='btn' onClick={handleUpdateUser}>Save Changes</button>
+                        </div>
+                    </>
+                    )}
                 </div>
+                {!shouldOpenAvatarEditor &&
                 <div className='flex justify-end flex-grow items-end p-4'>
                     <div className='tooltip tooltip-secondary' data-tip="Logout">
                         <LogOutIcon className='text-red-700 hover:text-red-600 hover:cursor-pointer' onClick={logOut}/>
                     </div>
                 </div>
+                }
             </div>
         </Modal>
     )

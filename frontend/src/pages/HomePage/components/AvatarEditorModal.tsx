@@ -38,8 +38,8 @@ const AvatarEditorModal = ({img, scale, setScale, setPreviewUrl, setShouldOpenAv
             <div className='flex w-full justify-center'>
                 <AvatarEditor
                 image={img}
-                width={250}
-                height={250}
+                width={180}
+                height={180}
                 border={20}
                 color={[255, 255, 255, 0.6]} // RGBA
                 scale={scale}
