@@ -13,6 +13,7 @@ const serializeMessages = async (rawMessages: RawMessage[]) => {
             isReply: m.isReply,
             replyId: m.replyId,
             reactions: m.reactions,
+            databaseFiles: m.databaseFiles
         };
         })
     );

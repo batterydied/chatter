@@ -1,5 +1,5 @@
 import { db } from '../config/firebase.js'
-import { collection, addDoc, getDocs, query, where, deleteDoc, getDoc, doc, serverTimestamp, updateDoc, orderBy } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, where, deleteDoc, getDoc, doc, serverTimestamp, updateDoc, orderBy, Timestamp } from "firebase/firestore"
 import ConversationSchema from "../models/conversationModel.js"
 import { deleteAllMessagesHelper } from './messageController.js'
 
@@ -25,7 +25,8 @@ class ConversationController{
                 createdAt: conversation.createdAt,
                 hiddenBy: conversation.hiddenBy,
                 directConversationId: conversation.directConversationId,
-                pfpFilePath: conversation.pfpFilePath ?? ''
+                pfpFilePath: conversation.pfpFilePath ?? '',
+                lastMessageTime: serverTimestamp()
             }
             const docRef = await addDoc(collectionRef, createdField)
             const docSnapshot = await getDoc(docRef)

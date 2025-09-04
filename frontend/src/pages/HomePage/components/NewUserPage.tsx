@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createUser, type AppUser } from '../homePageHelpers'
 import type { User } from 'firebase/auth'
-import truncateName from '../../../utils/truncateName'
+import { truncateName } from '../../../utils/truncate'
 
 type NewUserModalProps = {
     user: User,

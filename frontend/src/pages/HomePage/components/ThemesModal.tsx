@@ -35,7 +35,7 @@ const ThemesModal = ({isOpen, onClose}: ThemesModalProps) => {
                 <div className='p-22'>
                         <div className='grid grid-cols-5 gap-2'>
                             {themes.map((t)=>
-                                <button data-theme={t} className={`btn bg-neutral text-neutral-content`} onClick={()=>setTheme(t)}>
+                                <button key={t} data-theme={t} className={`btn bg-neutral text-neutral-content`} onClick={()=>setTheme(t)}>
                                     {t}
                                 </button>
                             )}

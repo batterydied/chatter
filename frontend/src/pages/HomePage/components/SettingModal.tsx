@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
 import { CameraIcon, EditIcon, LogOutIcon} from "../../../assets/icons"
 import { getPfpByFilePath } from "../../../utils/getPfp"
-import truncateName from "../../../utils/truncateName"
+import { truncateName } from "../../../utils/truncate"
 import { doc, updateDoc } from "firebase/firestore"
 import { db } from "../../../config/firebase"
 import { toast } from "sonner"
@@ -93,8 +93,8 @@ const SettingModal = ({isOpen, onClose, logOut}: SettingModalProps) => {
                                     <img src={previewUrl || getPfpByFilePath(user.pfpFilePath)} />
                                 </div>
                             </div>
-                            <div className='group absolute bottom-0 left-0 bg-neutral-content rounded-full p-2 hover:cursor-pointer hover:bg-base-content' onClick={()=>inputRef.current?.click()}>
-                                <CameraIcon className='group-hover:text-base-200 text-base-100'/>
+                            <div className='absolute bottom-0 left-0 rounded-full p-2 hover:cursor-pointer bg-base-content' onClick={()=>inputRef.current?.click()}>
+                                <CameraIcon className='text-base-100'/>
                             </div>
                         </div>
                         <input type="file" accept="image/*" className='hidden' ref={inputRef} onChange={handleFileChange}/>

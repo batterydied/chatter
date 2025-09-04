@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { db } from '../../../config/firebase'
-import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore'
 import type { Timestamp } from 'firebase/firestore'
-import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon, PlusIcon } from '../../../assets/icons'
+import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon, PlusIcon, FileIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
 import { CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
@@ -19,7 +19,9 @@ import serializeMessages from '../../../utils/serializeMessages'
 import ConversationHeader from './ConversationHeader'
 import formatMessageTime from '../../../utils/formatMessageTime'
 import { useHomePageContext } from '../../../hooks/useHomePageContext'
-import truncateMessage from '../../../utils/truncateMessage'
+import { truncateMessage, truncateFilename } from '../../../utils/truncate'
+import { v4 as uuidv4 } from "uuid";
+import CloseButton from './CloseButton'
 
 type ConversationWindowProps = {
   conversation: Conversation,
@@ -37,6 +39,10 @@ export type RawMessage = {
   reactions: {
     user: string,
     emoji: string
+  }[],
+  databaseFiles: {
+    filepath: string,
+    name: string
   }[]
 }
 
@@ -52,7 +58,22 @@ export type SerializedMessage = {
     user: string
     emoji: string,
   }[],
+  databaseFiles: {
+    filepath: string,
+    name: string
+  }[]
 }
+
+type TrackedFile = {
+  id: string,
+  file: File
+}
+
+type DatabaseFile = {
+  name: string,
+  filepath: string
+}
+
 const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   const user = useHomePageContext()
   const [messages, setMessages] = useState<SerializedMessage[]>([])
@@ -73,6 +94,8 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   const [isReactSelected, setIsReactSelected] = useState(false)
   const [selectedMessageId, setSelectedMessageId] = useState('')
   const [shouldRecomputeAllRows, setShouldRecomputeAllRows] = useState(false)
+  const [files, setFiles] = useState<TrackedFile[]>([])
+  const [shouldFocus, setShouldFocus] = useState(false)
 
   const [usernameRecord, setUsernameRecord] = useState<Record<string, string>>({})
   const [pfpRecord, setPfpRecord] = useState<Record<string, string>>({})
@@ -82,11 +105,21 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   const cacheRef = useRef(new CellMeasurerCache({fixedWidth: true, defaultHeight: 100}))
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
-  const editTextareRef = useRef<HTMLTextAreaElement | null>(null)
+  const editTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const listRef = useRef<List>(null)
   const measureRef = useRef<(() => void) | null>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
   const pickerIconRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const allowedTypes = [
+    ".jpeg",
+    ".png",
+    ".pdf",
+    "image/jpeg",
+    "image/png",
+    "application/pdf",
+  ];
 
   const fetchMessages = useCallback(async (size: number, prevMessageId: string | null) => {
     const params = {size, prevMessageId}
@@ -143,6 +176,10 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     }
   }, [conversation, user.id])
 
+  useEffect(() => {
+    setShouldFocus(true);
+  }, [conversation]);
+
   useEffect(()=>{
     for (const key in subscriptionDict.current) {
       {
@@ -161,13 +198,25 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   }
   
   const handleSubmit = () => {
-    if(newMessage){
-      uploadMessage(conversation.id, user.id, newMessage, replyMessage != null, replyMessage?.id || '')
+    if(newMessage || files){
+      uploadMessage(conversation.id, user.id, newMessage, replyMessage != null, replyMessage?.id || '', files)
       setNewMessage('')
     }
+
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
+  }
+
+  const handleAttachFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const filesList = e.currentTarget.files
+    if(!filesList) return
+    const currentAttachedFiles = Array.from(filesList).map((f)=>({id: uuidv4(), file: f}))
+    if(currentAttachedFiles.length + files.length > 10){
+      toast.error("You can't upload more than 10 files at a time!")
+      return
+    }
+    setFiles(prev => [...prev, ...currentAttachedFiles])
   }
 
   const handleDeleteConfirmation = (msg: SerializedMessage) => {
@@ -208,19 +257,24 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     if(idx >= 0) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
   }, [editMessage?.id, messages])
 
-  const handleReply = (msg: SerializedMessage) => {
+  const handleReply = useCallback((msg: SerializedMessage) => {
     setReplyMessage(msg)
     textareaRef.current?.focus();
-  }
+  }, [])
+
+  const setTextareaRef = useCallback((node: HTMLTextAreaElement | null) => {
+    textareaRef.current = node;
+    if (node && shouldFocus) {
+      node.focus();
+      setShouldFocus(false);
+    }
+  }, [shouldFocus]);
 
   const handleUpdate = useCallback(async (msg: SerializedMessage, updatedMsg: string) => {
-    const sendUpdate = async (msgId: string, updatedMsg: string) => {
+    const sendUpdate = async () => {
       try{
-        await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversation.id}/message/${msgId}`, 
-          {
-            type: 'text',
-            text: updatedMsg
-          })
+        await updateDoc(doc(db, 'conversations', conversation.id, 'messages', msg.id), {text: updatedMsg, isEdited: true})
+
         setMessages(prevMessages =>
           prevMessages.map((m) =>
             m.id === msg.id ? { ...m, text: updatedMsg, isEdited: true } : m
@@ -234,7 +288,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
       handleDeleteConfirmation(msg)
     }
     else if(msg.text !== updatedMsg){
-      await sendUpdate(msg.id, updatedMsg)
+      await sendUpdate()
     }
 
     cancelEdit()
@@ -384,6 +438,29 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     return usernameRecord[id]
   }
 
+  const handleFile =  useCallback(()=>{
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleRemoveFile = useCallback((id: string)=>{
+    setFiles(prev => prev.filter((f)=>f.id != id))
+  }, [])
+
+  const renderFiles = () => {
+    return (
+      <div className='flex flex-row w-full overflow-x-scroll space-x-2'>
+        {files.map((f)=>
+          <div key={f.id} className='relative flex items-center justify-center flex-shrink-0 w-[150px] h-[150px] bg-base-100 rounded-md'>
+            <CloseButton onClick={()=>handleRemoveFile(f.id)} className='absolute top-0.5 right-0.5'/>
+            <FileIcon size={36} className='text-accent'/>
+            <div className='absolute bottom-0 text-sm pointer-events-none'>
+              {truncateFilename(f.file.name)}
+            </div>
+          </div>
+          )}
+      </div>
+    )
+  }
   const renderMessages: ListRowRenderer = ({ index, key, parent, style }) => {
     const msg = messages[index]
     const prev = index > 0 ? messages[index - 1] : null
@@ -450,7 +527,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                       <textarea
                         id='edit-message'
                         ref={(el)=>{
-                          editTextareRef.current = el
+                          editTextareaRef.current = el
                           if(el){
                             if(textareaRef.current && document.activeElement !== textareaRef.current){
                               const len = el.value.length
@@ -471,21 +548,27 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                         <span className="text-accent"> save</span>
                       </p>
                     </div>):(
-                    <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-                      <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
-                        {repliedMessageId === '' ? null : repliedMessage ? (
-                          <>
-                            <div className="flex justify-start text-gray-400">
-                              Replying to {getUsername(repliedMessage.senderId)}
-                            </div>
-                            <div className="flex justify-start">{repliedMessage.text}</div>
-                          </>
-                        ) : (
-                          <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
-                        )}
-                      </div>
-                      <div className="break-words whitespace-normal">
-                        {msg.text}
+                    <div>
+                      {msg.databaseFiles && msg.databaseFiles.length > 0 &&
+                      <div>
+                        To be added
+                      </div>}
+                      <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+                        <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
+                          {repliedMessageId === '' ? null : repliedMessage ? (
+                            <>
+                              <div className="flex justify-start text-gray-400">
+                                Replying to {getUsername(repliedMessage.senderId)}
+                              </div>
+                              <div className="flex justify-start">{repliedMessage.text}</div>
+                            </>
+                          ) : (
+                            <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
+                          )}
+                        </div>
+                        <div className="break-words whitespace-normal">
+                          {msg.text}
+                        </div>
                       </div>
                     </div>)}
                 <div className="chat-footer mt-1 text-lg">
@@ -588,6 +671,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
           isReply: data.isReply,
           replyId: data.replyId,
           reactions: data.reactions,
+          databaseFiles: data.databaseFiles
         }]);
 
         subscriptionDict.current[msg.id] = unsub
@@ -650,6 +734,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
           isReply: data.isReply,
           replyId: data.replyId,
           reactions: data.reactions,
+          databaseFiles: data.databaseFile
         };
       });
 
@@ -682,24 +767,38 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     setShouldOpenPicker(prev => !prev)
   }
 
-  const uploadMessage = async (conversationId: string, userId: string, inputMessage: string, isReply: boolean, replyId: string) => {
+  const uploadMessage = async (conversationId: string, userId: string, inputMessage: string, isReply: boolean, replyId: string, incomingFiles: TrackedFile[]) => {
     try{
+      const uploadPromises = incomingFiles.map((incomingFile)=> supabase.storage.from('uploads').upload(`/${conversationId}/${incomingFile.id}`, incomingFile.file))
+      
+      await Promise.all(uploadPromises)
+
+      const databaseFiles: DatabaseFile[] = incomingFiles.map((f)=>({
+        name: f.file.name, 
+        filepath: `${conversationId}/${f.id}`
+      }))
+
       const message = {
         senderId: userId,
-        type: 'text',
         text: inputMessage,
         isReply,
-        replyId
+        replyId,
+        isEdited: false,
+        reactions: [],
+        createdAt: serverTimestamp(),
+        databaseFiles
       }
       setShouldOpenPicker(false)
       setReplyMessage(null)
-      await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversationId}/message`, message)
+      setFiles([])
+
+      const conversationMessageRef = collection(db, 'conversations', conversationId, 'messages')
+      const conversationRef = doc(db, 'conversations', conversationId)
+   
+      await addDoc(conversationMessageRef, message)
+      await updateDoc(conversationRef, {lastMessageTime: serverTimestamp()})
     }catch(e){
-      if(axios.isAxiosError(e)){
-        console.error(e.message)
-      }else{
-        console.error('Unknown error occurred')
-      }
+      console.error(e)
     }
   }
 
@@ -727,7 +826,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
           <VList cacheRef={cacheRef} listRef={listRef} renderer={renderMessages} data={messages} className='mt-2' onScroll={handleScroll} scrollToIndex={shouldScrollToBottom ? messages.length: undefined} rowKey={({ index }:{index: number}) => messages[index].id}/>
         </div>
         <div className='relative'>
-          <div className="absolute right-0 bottom-full" ref={pickerRef}>
+          <div className="absolute right-0 bottom-13 z-50" ref={pickerRef}>
             <EmojiPicker 
             onEmojiClick={(emojiObj)=>{
               setNewMessage(prev => prev + emojiObj.emoji)
@@ -748,10 +847,14 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
               
               <XIcon className='hover:cursor-pointer text-gray-400 hover:text-neutral-content' onClick={()=>setReplyMessage(null)}/>
             </div>}
+            {files.length > 0 && 
+              renderFiles()
+            }
             <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-start p-2'>
               <div className='flex flex-row items-start w-full flex-1'>
                 <div className='group hover:bg-neutral p-1 rounded-md !mr-1' ref={pickerIconRef}>
-                    <PlusIcon onClick={handlePicker} className={`hover:cursor-pointer group-hover:text-neutral-content ${shouldOpenPicker ? '!text-accent' : 'text-gray-600'}`} />
+                    <PlusIcon onClick={handleFile} className={`hover:cursor-pointer group-hover:text-neutral-content ${shouldOpenPicker ? '!text-accent' : 'text-gray-600'}`} />
+                    <input onChange={(e)=>handleAttachFiles(e)} ref={fileInputRef} type='file' className='hidden' accept={allowedTypes.join(',')} multiple />
                 </div>
                 <textarea
                   id="chat-message"
@@ -770,7 +873,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                       handleSubmit();
                     }
                   }}
-                  ref={textareaRef}
+                  ref={setTextareaRef}
                   className="focus:outline-none textarea-md resize-none overflow-auto !w-full max-h-40 mt-1.25"
                 />
               </div>

@@ -46,14 +46,13 @@ class MessageController{
     async createMessage(req, res){
         const { conversationId } = req.params
 
-        const { senderId, type, text, fileUrl, fileName, fileSize, isReply, replyId } = req.body
+        const { senderId, text, fileUrl, fileName, fileSize, isReply, replyId } = req.body
         const conversationRef = doc(db, 'conversations', conversationId)
         const messageCollectionRef = collection(db, 'conversations', conversationId, 'messages')
 
         try{
             const rawMessage = {
                 senderId,
-                type,
                 text,
                 fileUrl,
                 fileName,
@@ -75,6 +74,7 @@ class MessageController{
             const updatedMessageTime = {
                 lastMessageTime: serverTimestamp()
             }
+
             await updateDoc(conversationRef, updatedMessageTime)
 
             res.status(201).json({status: 'Success', data: 

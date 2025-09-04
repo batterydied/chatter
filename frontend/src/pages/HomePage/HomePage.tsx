@@ -193,6 +193,7 @@ const HomePage = () => {
     
     useEffect(() => {
         if(!appUser) return
+
         const convQuery = query(
             collection(db, 'conversations'),
             where('participants', 'array-contains', appUser.id),
@@ -368,46 +369,44 @@ const HomePage = () => {
     if(loading) return <Loading />
 
     return (
-        <div className='p-2 w-full h-full flex justify-center items-center'>
+        <div className='p-2 w-screen h-screen flex'>
             {user && user.email ? (
                 isNewUser ? (
                     <NewUserModal setIsNewUser={setIsNewUser} email={user.email} setAppUser={setAppUser} user={user}/>
                 ) : (appUser &&
                         <HomePageContext.Provider value={appUser}>
-                            <div className='flex flex-row w-full h-full'>
-                                <div className='min-w-[360px]'>
-                                    <ul className='list h-5/6 overflow-y-auto overflow-x-hidden'>
-                                        <li>
-                                            <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 hover:text-accent' onClick={handleClearSelectConversation}>
-                                                <UserIcon className='group-hover:text-accent' />
-                                                Friends
-                                            </button>
-                                        </li>
-                                        <li>
-                                            <FriendRequestBtn onClick={handleOpenRequest} count={modalOpen ? 0 : unreadRequest} />
-                                        </li>
-                                        <div className='border-b border-gray-700 pb-2' />
-                                        <div className='my-1 flex justify-start text-sm'>
-                                            Direct Messages
-                                        </div>
-                                        <DynamicVList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
-                                    </ul>
-                                    <div className='flex items-end h-1/6 w-full'>
-                                        <ProfilePanel appUser={appUser} handleOpenSetting={handleOpenSetting} />
+                            <div className='flex-shrink-0 w-[360px]'>
+                                <ul className='list h-5/6 overflow-y-auto overflow-x-hidden'>
+                                    <li>
+                                        <button className='group btn justify-start w-full border-0 shadow-none bg-base-100 hover:bg-base-300 hover:text-accent' onClick={handleClearSelectConversation}>
+                                            <UserIcon className='group-hover:text-accent' />
+                                            Friends
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <FriendRequestBtn onClick={handleOpenRequest} count={modalOpen ? 0 : unreadRequest} />
+                                    </li>
+                                    <div className='border-b border-gray-700 pb-2' />
+                                    <div className='my-1 flex justify-start text-sm'>
+                                        Direct Messages
                                     </div>
+                                    <DynamicVList cacheRef={conversationCacheRef} listRef={conversationListRef} renderer={renderConversations} data={visibleConversations} className='overflow-x-hidden'/> 
+                                </ul>
+                                <div className='flex items-end h-1/6 w-full'>
+                                    <ProfilePanel appUser={appUser} handleOpenSetting={handleOpenSetting} />
                                 </div>
-                                <div className='ml-2 p-2 w-full bg-base-300'>
-                                    {selectedConversation ? 
-                                    <HeaderContext.Provider value={displayInfoRecord[selectedConversation.id] || null}>
-                                        <ConversationWindow conversation={selectedConversation} />
-                                    </HeaderContext.Provider>
-                                    : 
-                                    <FriendList setSelectedConversation={setSelectedConversation}/>
-                                    }
-                                </div>
-                                <RequestModal isOpen={modalOpen} cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} onClose={handleCloseRequestModal} handleDeclineAll={handleDeclineAll}/>
-                                <SettingModal isOpen={settingModalOpen} onClose={()=>setSettingModalOpen(false)} logOut={logOut}/>
                             </div>
+                            <div className='w-[calc(100%-360px)] ml-2 p-2 bg-base-300'>
+                                {selectedConversation ? 
+                                <HeaderContext.Provider value={displayInfoRecord[selectedConversation.id] || null}>
+                                    <ConversationWindow conversation={selectedConversation} />
+                                </HeaderContext.Provider>
+                                : 
+                                <FriendList setSelectedConversation={setSelectedConversation}/>
+                                }
+                            </div>
+                            <RequestModal isOpen={modalOpen} cacheRef={requestCacheRef} listRef={requestListRef} renderer={renderRequests} data={friendRequests} onClose={handleCloseRequestModal} handleDeclineAll={handleDeclineAll}/>
+                            <SettingModal isOpen={settingModalOpen} onClose={()=>setSettingModalOpen(false)} logOut={logOut}/>
                         </HomePageContext.Provider>
                     )
                 ) : (
