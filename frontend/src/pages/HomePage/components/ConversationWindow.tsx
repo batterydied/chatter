@@ -3,7 +3,7 @@ import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { addDoc, collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore'
 import type { Timestamp } from 'firebase/firestore'
-import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon, PlusIcon, FileIcon } from '../../../assets/icons'
+import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon, PlusIcon, FileIcon, ImageIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
 import { CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
@@ -42,7 +42,8 @@ export type RawMessage = {
   }[],
   databaseFiles: {
     filepath: string,
-    name: string
+    name: string,
+    type: string
   }[]
 }
 
@@ -120,6 +121,34 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     "image/png",
     "application/pdf",
   ];
+
+  const [signedUrlsMap, setSignedUrlsMap] = useState<Record<string, string[]>>({});
+
+  const fetchSignedUrlsForMessage = async (msgId: string, files: { filepath: string }[]) => {
+    const urls = await Promise.all(
+      files.map(async (file) => {
+        const { data, error } = await supabase.storage
+          .from('uploads')
+          .createSignedUrl(file.filepath, 60 * 60);
+        if (error) {
+          console.error(error);
+          return '';
+        }
+        return data.signedUrl;
+      })
+    );
+    setSignedUrlsMap((prev) => ({ ...prev, [msgId]: urls }));
+  };
+
+  useEffect(() => {
+
+    messages.forEach((msg) => {
+      if (msg.databaseFiles && !signedUrlsMap[msg.id]) {
+        fetchSignedUrlsForMessage(msg.id, msg.databaseFiles);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
 
   const fetchMessages = useCallback(async (size: number, prevMessageId: string | null) => {
     const params = {size, prevMessageId}
@@ -548,29 +577,39 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                         <span className="text-accent"> save</span>
                       </p>
                     </div>):(
-                    <div>
-                      {msg.databaseFiles && msg.databaseFiles.length > 0 &&
-                      <div>
-                        To be added
-                      </div>}
-                      <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-                        <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
-                          {repliedMessageId === '' ? null : repliedMessage ? (
-                            <>
-                              <div className="flex justify-start text-gray-400">
-                                Replying to {getUsername(repliedMessage.senderId)}
-                              </div>
-                              <div className="flex justify-start">{repliedMessage.text}</div>
-                            </>
-                          ) : (
-                            <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
-                          )}
+                    <>
+                      {signedUrlsMap[msg.id]?.map((url, i) => (
+                        <img key={i} src={url} onLoad={measure} className="my-1 rounded-md w-[300px]" />
+                      ))}
+                      {msg.text != '' && 
+                        <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+                          <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
+                            {repliedMessageId === '' ? null : repliedMessage ? (
+                              <>
+                                <div className="flex justify-start text-gray-400">
+                                  Replying to {getUsername(repliedMessage.senderId)}
+                                </div>
+                                {repliedMessage.text == '' ?
+                                <div className="flex justify-start italic items-center">
+                                  <p className='mr-1'>attachment</p>
+                                  <ImageIcon />
+                                </div>
+                                :
+                                <div className="flex justify-start">{repliedMessage.text}</div>
+                                }
+                                
+                              </>
+                            ) : (
+                              <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
+                            )}
+                          </div>
+                          <div className='break-words'>
+                            {msg.text}
+                          </div>
                         </div>
-                        <div className="break-words whitespace-normal">
-                          {msg.text}
-                        </div>
-                      </div>
-                    </div>)}
+                      }
+                    </>)}
+        
                 <div className="chat-footer mt-1 text-lg">
                   <Reactions
                     msgId={msg.id}
@@ -676,7 +715,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
 
         subscriptionDict.current[msg.id] = unsub
         setMessages(prev => {
-          const newMessages = prev.map((m) => {
+          const newMessages = prev.map((m, idx) => {
             if (m.id !== serialized.id) return m;
 
             // Only update if text or isEdited (or other fields you care about) changed
@@ -688,6 +727,8 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
               m.reactions !== serialized.reactions
               // add more fields to compare if relevant
             ) {
+              cacheRef.current.clear(idx, 0)
+              listRef.current?.recomputeRowHeights()
               return serialized;
             }
             return m;
@@ -775,6 +816,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
 
       const databaseFiles: DatabaseFile[] = incomingFiles.map((f)=>({
         name: f.file.name, 
+        type: f.file.type,
         filepath: `${conversationId}/${f.id}`
       }))
 
