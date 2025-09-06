@@ -10,6 +10,7 @@ type DeleteMessageProps = {
 }
 
 const DeleteMessageModal = ({deleteMessage, username, sendDelete, setDeleteMessage} : DeleteMessageProps) => {
+    if(!deleteMessage) return
     return (
         <dialog id="delete_confirmation_modal" className="modal">
             <div className="modal-box">
@@ -27,10 +28,15 @@ const DeleteMessageModal = ({deleteMessage, username, sendDelete, setDeleteMessa
                     {username}
                     <time className="text-xs opacity-50 ml-2">{deleteMessage && formatMessageTime(deleteMessage.createdAt)}</time>
                 </div>
+                {deleteMessage.text ? 
                 <div className={`chat-bubble mt-3`}>
-                    {deleteMessage && deleteMessage.text.length > 500 ? deleteMessage.text.slice(0, 500) + '...' : deleteMessage?.text}
-                    {deleteMessage?.isEdited && <span className='absolute bottom-0 right-full px-2 text-xs text-gray-300'>(edited)</span>}
+                    {deleteMessage.text.length > 500 ? deleteMessage.text.slice(0, 500) + '...' : deleteMessage?.text}
+                    {deleteMessage.isEdited && <span className='absolute bottom-0 right-full px-2 text-xs text-gray-300'>(edited)</span>}
+                </div>:
+                <div className='italic p-2 bg-accent'>
+                    attachment
                 </div>
+                }
             </div>
             </div>
       </dialog>

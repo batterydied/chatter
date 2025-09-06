@@ -3,7 +3,7 @@ import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { addDoc, collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore'
 import type { Timestamp } from 'firebase/firestore'
-import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon, PlusIcon, FileIcon, ImageIcon } from '../../../assets/icons'
+import { EditIcon, SmileIcon, ReplyIcon, DeleteIcon, XIcon, PlusIcon, FileIcon, ImageIcon, PdfIcon } from '../../../assets/icons'
 import { toast } from 'sonner'
 import { CellMeasurer, CellMeasurerCache, List } from 'react-virtualized'
 import type { ListRowRenderer } from 'react-virtualized'
@@ -59,10 +59,7 @@ export type SerializedMessage = {
     user: string
     emoji: string,
   }[],
-  databaseFiles: {
-    filepath: string,
-    name: string
-  }[]
+  databaseFiles: DatabaseFile[]
 }
 
 type TrackedFile = {
@@ -72,7 +69,8 @@ type TrackedFile = {
 
 type DatabaseFile = {
   name: string,
-  filepath: string
+  filepath: string,
+  type: string
 }
 
 const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
@@ -122,28 +120,30 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     "application/pdf",
   ];
 
-  const [signedUrlsMap, setSignedUrlsMap] = useState<Record<string, string[]>>({});
+  const [fileMetadataMap, setFileMetaDataMap] = useState<Record<string, {name: string, type: string, url: string}[]>>({});
 
-  const fetchSignedUrlsForMessage = async (msgId: string, files: { filepath: string }[]) => {
-    const urls = await Promise.all(
+  const fetchSignedUrlsForMessage = async (msgId: string, files: DatabaseFile[]) => {
+    const metadatas = await Promise.all(
       files.map(async (file) => {
+        const metadata = {name: file.name, type: file.type, url: ''}
         const { data, error } = await supabase.storage
           .from('uploads')
           .createSignedUrl(file.filepath, 60 * 60);
         if (error) {
           console.error(error);
-          return '';
+          return metadata;
         }
-        return data.signedUrl;
+        metadata.url = data.signedUrl
+        return metadata
       })
     );
-    setSignedUrlsMap((prev) => ({ ...prev, [msgId]: urls }));
+    setFileMetaDataMap(prev => ({ ...prev, [msgId]: metadatas }));
   };
 
   useEffect(() => {
 
     messages.forEach((msg) => {
-      if (msg.databaseFiles && !signedUrlsMap[msg.id]) {
+      if (msg.databaseFiles && !fileMetadataMap[msg.id]) {
         fetchSignedUrlsForMessage(msg.id, msg.databaseFiles);
       }
     });
@@ -170,6 +170,10 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
       return []
     }
   }, [conversation])
+
+  useEffect(() => {
+    if(deleteMessage) (document.getElementById('delete_confirmation_modal') as HTMLDialogElement).showModal();
+  }, [deleteMessage])
 
   useEffect(() => {
     const unsubscribers: (() => void)[] = []
@@ -218,6 +222,22 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     subscriptionDict.current = {}
   }, [conversation])
 
+  const checkUrlExpired = async (msg: SerializedMessage, url: string, idx: number) => {
+    const res = await fetch(url, {method:'HEAD'})
+    if(res.status == 400){
+      const mapping = await Promise.all(msg.databaseFiles.map(async f => {
+        const { data } = await supabase.storage.from('uploads').createSignedUrl(f.filepath, 60 * 60)
+        const url = data?.signedUrl || ''
+        return (
+          {name: f.name, type: f.type, url}
+        )
+      }))
+      setFileMetaDataMap(prev => ({ ...prev, [msg.id]: mapping }));
+      return mapping[idx].url
+    }
+    return url
+  }
+
   const handleSelectHoverId = (msgId: string)=>{
     setHoveredMessageId(msgId)
   }
@@ -250,7 +270,6 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
 
   const handleDeleteConfirmation = (msg: SerializedMessage) => {
     setDeleteMessage(msg);
-    (document.getElementById('delete_confirmation_modal') as HTMLDialogElement)!.showModal();
   }
 
   const sendDelete = async (msgId: string) => {
@@ -541,7 +560,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
               >
                 <div className="chat-image avatar">
                   <div className="w-10 rounded-full bg-base-100 flex items-center justify-center">
-                    <img src={getPfpById(msg.senderId)}/>
+                    <img src={getPfpById(msg.senderId)} />
                   </div>
                 </div>
                 {!isGrouped && (
@@ -576,40 +595,55 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                         Escape to <span className="text-accent">cancel</span>, enter to 
                         <span className="text-accent"> save</span>
                       </p>
-                    </div>):(
-                    <>
-                      {signedUrlsMap[msg.id]?.map((url, i) => (
-                        <img key={i} src={url} onLoad={measure} className="my-1 rounded-md w-[300px]" />
-                      ))}
-                      {msg.text != '' && 
-                        <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
-                          <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
-                            {repliedMessageId === '' ? null : repliedMessage ? (
-                              <>
-                                <div className="flex justify-start text-gray-400">
-                                  Replying to {getUsername(repliedMessage.senderId)}
-                                </div>
-                                {repliedMessage.text == '' ?
-                                <div className="flex justify-start italic items-center">
-                                  <p className='mr-1'>attachment</p>
-                                  <ImageIcon />
-                                </div>
-                                :
-                                <div className="flex justify-start">{repliedMessage.text}</div>
+                    </div>):
+                    (
+                    <div className='w-full flex flex-col items-end'>
+                      <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+                          {fileMetadataMap[msg.id]?.map((data, idx) => {
+                            return (
+                              data.type == 'application/pdf' ?
+                              <div className='flex hover:cursor-pointer border-1 border-accent p-1 rounded-md hover:bg-base-300 m-1' onClick={async ()=>{
+                                const url = await checkUrlExpired(msg, data.url, idx)
+                                window.open(url, '_blank', 'noopener,noreferrer')
+                              }} ref={(el)=>{
+                                if(el){
+                                  requestAnimationFrame(measure)
                                 }
-                                
-                              </>
-                            ) : (
-                              <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
-                            )}
+                              }}>
+                                <PdfIcon/>
+                                {truncateFilename(data.name)}
+                              </div> :
+                              <img key={data.name} src={data.url} onLoad={measure} className="my-1 rounded-md w-[300px]" />
+                            )
+                            })
+                          }
+                      </div>
+                      {msg.text != '' && 
+                          <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
+                            <div className="border-l-2 border-l-accent px-2 flex-col text-sm">
+                              {repliedMessageId === '' ? null : repliedMessage ? (
+                                <>
+                                  <div className="flex justify-start text-gray-400">
+                                    Replying to {getUsername(repliedMessage.senderId)}
+                                  </div>
+                                  {repliedMessage.text == '' ?
+                                  <div className="flex justify-start italic items-center">
+                                    <p className='mr-1'>attachment</p>
+                                    <ImageIcon />
+                                  </div>
+                                  :
+                                  <div className="flex justify-start">{repliedMessage.text}</div>
+                                  } 
+                                </>
+                              ) : (
+                                <div className="flex justify-start text-gray-400 italic">Original message was deleted</div>
+                              )}
+                            </div>
+                            <div className=''>{msg.text}</div>
                           </div>
-                          <div className='break-words'>
-                            {msg.text}
-                          </div>
-                        </div>
                       }
-                    </>)}
-        
+                    </div>)}
+                    
                 <div className="chat-footer mt-1 text-lg">
                   <Reactions
                     msgId={msg.id}
@@ -637,7 +671,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                       setSelectedMessageId(msg.id)
                     }
                   } className='text-gray-400 rounded-md hover:bg-neutral hover:text-neutral-content hover:cursor-pointer mx-1' />
-                  {user.id == msg.senderId && (
+                  {user.id == msg.senderId &&(
                       <EditIcon onClick={() => handleEdit(msg, index)} className='text-gray-400 rounded-md hover:bg-neutral hover:text-neutral-content hover:cursor-pointer mx-1' />
                   )}
                   <ReplyIcon onClick={() => handleReply(msg)} className='text-gray-400 rounded-md hover:bg-neutral hover:text-neutral-content hover:cursor-pointer mx-1' />
@@ -671,13 +705,11 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
 
   useEffect(()=>{
     if(shouldScrollToBottom && messages.length > 0){
-      listRef.current?.scrollToRow(messages.length - 1)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(()=>{
+        listRef.current?.scrollToRow(messages.length - 1)
+        requestAnimationFrame(() => {
           setShouldScrollToBottom(false)
           setInitialScrollDone(true)
         })
-      })
     }
   }, [shouldScrollToBottom, messages])
 
