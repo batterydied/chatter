@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef} from 'react'
 import axios from 'axios'
 import { db } from '../../../config/firebase'
 import { addDoc, collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore'
@@ -43,7 +43,7 @@ export type RawMessage = {
   databaseFiles: {
     filepath: string,
     name: string,
-    type: string
+    type: string,
   }[]
 }
 
@@ -95,7 +95,8 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   const [shouldRecomputeAllRows, setShouldRecomputeAllRows] = useState(false)
   const [files, setFiles] = useState<TrackedFile[]>([])
   const [shouldFocus, setShouldFocus] = useState(false)
-
+  const [fileMetadataMap, setFileMetaDataMap] = useState<Record<string, {name: string, type: string, url: string, filepath: string}[]>>({})
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
   const [usernameRecord, setUsernameRecord] = useState<Record<string, string>>({})
   const [pfpRecord, setPfpRecord] = useState<Record<string, string>>({})
 
@@ -118,35 +119,37 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     "image/jpeg",
     "image/png",
     "application/pdf",
-  ];
-
-  const [fileMetadataMap, setFileMetaDataMap] = useState<Record<string, {name: string, type: string, url: string}[]>>({});
+  ]
 
   const fetchSignedUrlsForMessage = async (msgId: string, files: DatabaseFile[]) => {
-    const metadatas = await Promise.all(
+    const fileObjs = await Promise.all(
       files.map(async (file) => {
-        const metadata = {name: file.name, type: file.type, url: ''}
+        const fileObj = {name: file.name, type: file.type, url: '', filepath: file.filepath}
         const { data, error } = await supabase.storage
           .from('uploads')
           .createSignedUrl(file.filepath, 60 * 60);
         if (error) {
           console.error(error);
-          return metadata;
+          return fileObj;
         }
-        metadata.url = data.signedUrl
-        return metadata
+        fileObj.url = data.signedUrl
+        return fileObj
       })
     );
-    setFileMetaDataMap(prev => ({ ...prev, [msgId]: metadatas }));
+    setFileMetaDataMap(prev => ({ ...prev, [msgId]: fileObjs }));
+    return fileObjs
   };
 
   useEffect(() => {
+    const fetchSignedUrls = async () => {
+      await Promise.all(messages.map(async msg => {
+        if (msg.databaseFiles && !fileMetadataMap[msg.id]) {
+          fetchSignedUrlsForMessage(msg.id, msg.databaseFiles)
+        }
+      }))
+    }
+    fetchSignedUrls()
 
-    messages.forEach((msg) => {
-      if (msg.databaseFiles && !fileMetadataMap[msg.id]) {
-        fetchSignedUrlsForMessage(msg.id, msg.databaseFiles);
-      }
-    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
@@ -229,7 +232,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
         const { data } = await supabase.storage.from('uploads').createSignedUrl(f.filepath, 60 * 60)
         const url = data?.signedUrl || ''
         return (
-          {name: f.name, type: f.type, url}
+          {name: f.name, type: f.type, url, filepath: f.filepath}
         )
       }))
       setFileMetaDataMap(prev => ({ ...prev, [msg.id]: mapping }));
@@ -257,6 +260,25 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     }
   }
 
+  const renderFiles = useCallback((msg: SerializedMessage, measure: ()=>void) => {
+    const component = fileMetadataMap[msg.id]?.map((data, idx) => {
+      return (
+        data.type == 'application/pdf' ?
+        <div className='flex hover:cursor-pointer border-1 border-accent h-[30px] px-1 rounded-md hover:bg-base-300 m-1 items-center flex-shrink-0' 
+        onClick={async ()=>{
+          const url = await checkUrlExpired(msg, data.url, idx)
+          window.open(url, '_blank', 'noopener,noreferrer')
+        }}
+        >
+          <PdfIcon />
+          {truncateFilename(data.name) || ''}
+        </div> :
+        <img key={data.name} src={data.url} onLoad={measure} className="my-1 rounded-md w-[300px]" />
+      )
+    })
+    return component
+  }, [fileMetadataMap])
+
   const handleAttachFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filesList = e.currentTarget.files
     if(!filesList) return
@@ -272,8 +294,9 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     setDeleteMessage(msg);
   }
 
-  const sendDelete = async (msgId: string) => {
+  const sendDelete = async (msg: SerializedMessage) => {
     try{
+      const msgId = msg.id
       await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}/conversation/${conversation.id}/message/${msgId}`)
       let clearAllBelow = false
       setMessages(prev => prev.filter((m, idx) => {
@@ -284,12 +307,22 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
       }))
       setDeleteMessage(null)
       listRef.current?.recomputeRowHeights(); 
+
+      const filepaths = msg.databaseFiles.map(f => f.filepath)
+      supabase.storage.from('uploads').remove(filepaths)
+      
     }catch{
       toast.error('Could not delete message, try again later.')
     }
   }
 
-  const handleEdit = (msg: SerializedMessage, index: number) => {
+  const cancelEdit = useCallback(() => {
+    const idx = messages.findIndex((m)=> m.id == editMessage?.id)
+    setEditMessage(null)
+    if(idx >= 0) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
+  }, [editMessage?.id, messages])
+
+  const handleEdit = useCallback((msg: SerializedMessage, index: number) => {
     if(editMessage){
       cancelEdit()
     }
@@ -297,13 +330,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     setEditMessage(msg)
     setEditInputMessage(msg.text)
     listRef.current?.recomputeRowHeights(index)
-  }
-  
-  const cancelEdit = useCallback(() => {
-    const idx = messages.findIndex((m)=> m.id == editMessage?.id)
-    setEditMessage(null)
-    if(idx >= 0) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
-  }, [editMessage?.id, messages])
+  }, [cancelEdit, editMessage])
 
   const handleReply = useCallback((msg: SerializedMessage) => {
     setReplyMessage(msg)
@@ -379,7 +406,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  const handleIncrement = (emoji: string, msgId: string) => {
+  const handleIncrement = useCallback((emoji: string, msgId: string) => {
     let updatedReactions: Reaction[] = []
     const updatedMessages = messages.map((m)=>{
       if(m.id == msgId){
@@ -399,9 +426,9 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
 
     const idx = messages.findIndex((m) => m.id == msgId)
     if(idx >=0 ) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
-  }
+  }, [conversation.id, messages, user.id])
 
-  const handleDecrement = (emoji: string, msgId: string) => {
+  const handleDecrement = useCallback((emoji: string, msgId: string) => {
     let updatedReactions: Reaction[] = []
     const updatedMessages = messages.map((m)=>{
       if(m.id == msgId){
@@ -416,7 +443,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
 
     const idx = messages.findIndex((m) => m.id == msgId)
     if(idx >=0 ) cacheRef.current.clear(idx, 0); listRef.current?.recomputeRowHeights(idx)
-  }
+  }, [conversation.id, messages, user.id])
 
   const handleReact = (emoji: string) => {
     handleIncrement(emoji, selectedMessageId)
@@ -445,7 +472,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
       setLoadingMore(true);
 
       // Fetch older messages
-      const moreMessages = await fetchMessages(15, earliestMessageId);
+      const moreMessages = await fetchMessages(50, earliestMessageId);
       if (!moreMessages?.length) {
         setLoadingMore(false);
         return;
@@ -460,7 +487,6 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
       setEarliestMessageId(newEarliestId);
 
       setShouldRecomputeAllRows(true)
-
       requestAnimationFrame(()=>{listRef.current?.scrollToRow(moreMessages.length + 4)}) //unable to anchor the correct position so did some testing (it's a fudge factor)
       
       setLoadingMore(false);
@@ -469,7 +495,6 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   [initialScrollDone, loadingMore, hasMore, fetchMessages, earliestMessageId, messages]
 );
 
-
   useEffect(()=>{
     if(!shouldRecomputeAllRows) return
     cacheRef.current.clearAll()
@@ -477,14 +502,14 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     setShouldRecomputeAllRows(false)
   }, [shouldRecomputeAllRows])
 
-  const getPfpById = (id: string) => {
+  const getPfpById = useCallback((id: string) => {
     const url =  pfpRecord[id] || 'default/default_user.png'
     return supabase.storage.from('avatars').getPublicUrl(url).data.publicUrl
-  }
+  }, [pfpRecord])
 
-  const getUsername = (id: string) => {
+  const getUsername = useCallback((id: string) => {
     return usernameRecord[id]
-  }
+  }, [usernameRecord])
 
   const handleFile =  useCallback(()=>{
     fileInputRef.current?.click()
@@ -494,7 +519,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
     setFiles(prev => prev.filter((f)=>f.id != id))
   }, [])
 
-  const renderFiles = () => {
+  const renderAttachedFiles = () => {
     return (
       <div className='flex flex-row w-full overflow-x-scroll space-x-2'>
         {files.map((f)=>
@@ -509,7 +534,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
       </div>
     )
   }
-  const renderMessages: ListRowRenderer = ({ index, key, parent, style }) => {
+  const renderMessages: ListRowRenderer = useCallback(({ index, key, parent, style }) => {
     const msg = messages[index]
     const prev = index > 0 ? messages[index - 1] : null
     const isGrouped =
@@ -597,26 +622,9 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                       </p>
                     </div>):
                     (
-                    <div className='w-full flex flex-col items-end'>
+                    <div className={`w-full flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
                       <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-                          {fileMetadataMap[msg.id]?.map((data, idx) => {
-                            return (
-                              data.type == 'application/pdf' ?
-                              <div className='flex hover:cursor-pointer border-1 border-accent p-1 rounded-md hover:bg-base-300 m-1' onClick={async ()=>{
-                                const url = await checkUrlExpired(msg, data.url, idx)
-                                window.open(url, '_blank', 'noopener,noreferrer')
-                              }} ref={(el)=>{
-                                if(el){
-                                  requestAnimationFrame(measure)
-                                }
-                              }}>
-                                <PdfIcon/>
-                                {truncateFilename(data.name)}
-                              </div> :
-                              <img key={data.name} src={data.url} onLoad={measure} className="my-1 rounded-md w-[300px]" />
-                            )
-                            })
-                          }
+                          {renderFiles(msg, measure)}
                       </div>
                       {msg.text != '' && 
                           <div className={`chat-bubble bg-base-100 ${isGrouped ? 'mt-1' : 'mt-3'}`}>
@@ -683,22 +691,19 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
             </div>
             )}}
       </CellMeasurer>
-    )
-  }
+  )}, [editInputMessage, editMessage?.id, getPfpById, getUsername, handleDecrement, handleEdit, handleIncrement, handleReply, hoveredMessageId, messages, renderFiles, replyMessage?.id, user.id])
 
   useEffect(() => {
     const init = async () => {
       setLoadingMessages(true)
       setMessages([])
-      const initialMessages = await fetchMessages(15, null)
+      const initialMessages = await fetchMessages(50, null)
       if(initialMessages.length != 0){
         setEarliestMessageId(initialMessages[0].id)
         setMessages(initialMessages)
       }
-      requestAnimationFrame(() => {
-        setShouldScrollToBottom(true)
-        setLoadingMessages(false)
-      })
+      setShouldScrollToBottom(true)
+      setLoadingMessages(false)
     }
     init()
   }, [fetchMessages])
@@ -706,12 +711,13 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   useEffect(()=>{
     if(shouldScrollToBottom && messages.length > 0){
         listRef.current?.scrollToRow(messages.length - 1)
-        requestAnimationFrame(() => {
+        requestAnimationFrame(()=>{
           setShouldScrollToBottom(false)
           setInitialScrollDone(true)
         })
     }
-  }, [shouldScrollToBottom, messages])
+    
+  }, [shouldScrollToBottom, messages.length])
 
   useEffect(() => {
     messages.forEach((msg) => {
@@ -842,9 +848,15 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
 
   const uploadMessage = async (conversationId: string, userId: string, inputMessage: string, isReply: boolean, replyId: string, incomingFiles: TrackedFile[]) => {
     try{
+      setShouldOpenPicker(false)
+      setReplyMessage(null)
+      setFiles([])
+
+      setIsUploadingFile(true)
       const uploadPromises = incomingFiles.map((incomingFile)=> supabase.storage.from('uploads').upload(`/${conversationId}/${incomingFile.id}`, incomingFile.file))
       
       await Promise.all(uploadPromises)
+      setIsUploadingFile(false)
 
       const databaseFiles: DatabaseFile[] = incomingFiles.map((f)=>({
         name: f.file.name, 
@@ -862,9 +874,6 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
         createdAt: serverTimestamp(),
         databaseFiles
       }
-      setShouldOpenPicker(false)
-      setReplyMessage(null)
-      setFiles([])
 
       const conversationMessageRef = collection(db, 'conversations', conversationId, 'messages')
       const conversationRef = doc(db, 'conversations', conversationId)
@@ -887,6 +896,11 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   } 
   return (
     <div className='h-full w-full flex flex-col relative'>
+        {isUploadingFile && 
+          <div className='absolute z-50 h-full w-full bg-black/50 flex justify-center items-center'>
+            <div className='p-2 text-2xl'>Uploading files...</div>
+          </div>
+        }
         {isReactSelected && 
             <div className="absolute inset-0 z-50 flex items-center justify-center" onClick={()=>setIsReactSelected(false)}>
                 <div onClick={(e)=>e.stopPropagation()}>
@@ -922,7 +936,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
               <XIcon className='hover:cursor-pointer text-gray-400 hover:text-neutral-content' onClick={()=>setReplyMessage(null)}/>
             </div>}
             {files.length > 0 && 
-              renderFiles()
+              renderAttachedFiles()
             }
             <div className='border-1 rounded-md border-base-100 flex w-full justify-between items-start p-2'>
               <div className='flex flex-row items-start w-full flex-1'>
@@ -942,9 +956,11 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
                     e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // Resize
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && !e.shiftKey){ 
                       e.preventDefault();
-                      handleSubmit();
+                      if(newMessage || files.length > 0) {
+                        handleSubmit();
+                      }
                     }
                   }}
                   ref={setTextareaRef}

@@ -1,7 +1,7 @@
 import { AutoSizer, List } from "react-virtualized"
 import type { StaticModalBaseProps } from "../../../utils/ModalBaseProps";
 
-const VList = ({rowHeight, renderer, data, className}: StaticModalBaseProps) => {
+const VList = ({rowHeight, renderer, data, className }: StaticModalBaseProps) => {
     return (
         <AutoSizer>
             {({width, height})=>
