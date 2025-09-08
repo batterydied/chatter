@@ -251,6 +251,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   
   const handleSubmit = () => {
     if(newMessage || files){
+      setFiles([])
       uploadMessage(conversation.id, user.id, newMessage, replyMessage != null, replyMessage?.id || '', files)
       setNewMessage('')
     }
@@ -261,20 +262,23 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
   }
 
   const renderFiles = useCallback((msg: SerializedMessage, measure: ()=>void) => {
-    const component = fileMetadataMap[msg.id]?.map((data, idx) => {
+    const component = msg.databaseFiles?.map((data, idx) => {
+      const dataUrl = fileMetadataMap[msg.id]?.[idx].url || ''
       return (
         data.type == 'application/pdf' ?
         <div className='flex hover:cursor-pointer border-1 border-accent h-[30px] px-1 rounded-md hover:bg-base-300 m-1 items-center flex-shrink-0' 
         onClick={async ()=>{
-          const url = await checkUrlExpired(msg, data.url, idx)
+          const url = await checkUrlExpired(msg, dataUrl, idx)
           window.open(url, '_blank', 'noopener,noreferrer')
         }}
         >
           <PdfIcon />
           {truncateFilename(data.name) || ''}
         </div> :
-        <img key={data.name} src={data.url} onLoad={measure} className="my-1 rounded-md w-[300px]" />
-      )
+        <div className='w-[300px] flex-shrink-0'>
+          <img key={data.name} src={dataUrl} onLoad={measure} className="my-1 rounded-md" />
+        </div>
+        )
     })
     return component
   }, [fileMetadataMap])
@@ -851,6 +855,7 @@ const ConversationWindow = ({ conversation }: ConversationWindowProps) => {
       setShouldOpenPicker(false)
       setReplyMessage(null)
       setFiles([])
+      if(fileInputRef.current) fileInputRef.current.value = ''
 
       setIsUploadingFile(true)
       const uploadPromises = incomingFiles.map((incomingFile)=> supabase.storage.from('uploads').upload(`/${conversationId}/${incomingFile.id}`, incomingFile.file))
