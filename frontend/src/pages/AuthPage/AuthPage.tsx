@@ -25,11 +25,10 @@ const AuthPage = () => {
 
   return (
     <div className="bg-black overflow-hidden flex justify-center items-center h-screen w-screen relative touch-none overscroll-none">
-      {/* UI Overlay */}
       <div className="absolute animate-fade-in flex flex-col items-center gap-4 z-10">
-        <div className="text-7xl font-bold hover:cursor-default">Chatter</div>
+        <div className="text-7xl font-bold hover:cursor-default text-white">Chatter</div>
         <button
-          className="border p-2 rounded-md border-transparent hover:border-accent hover:cursor-pointer"
+          className="border p-2 rounded-md border-transparent hover:border-accent hover:cursor-pointer text-white"
           onClick={logIn}
         >
           Sign in with Google
